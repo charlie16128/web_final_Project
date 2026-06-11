@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>註冊｜TeamUp Campus</title>
+  <title>註冊 - TeamUp Campus</title>
   <link rel="stylesheet" href="/stylesheets/style.css">
 </head>
 <body class="auth-page">
@@ -11,22 +11,47 @@
     <main class="auth-shell">
       <section class="auth-copy">
         <p class="eyebrow">TeamUp Campus</p>
-        <h1>建立學生帳號</h1>
-        <p>填寫你的技能與簡介，讓隊友更容易找到你。</p>
+        <h1>建立你的帳號</h1>
+        <p>使用學號與 Email 註冊，開始尋找課程專題夥伴。</p>
       </section>
 
       <section class="panel auth-card">
         <form class="stack" @submit.prevent="submit">
-          <label>姓名<input v-model.trim="form.name" required autofocus></label>
-          <label>班級<input v-model.trim="form.class_name"></label>
-          <label>Email<input v-model.trim="form.email" type="email" required></label>
-          <label>密碼<input v-model="form.password" type="password" required minlength="6"></label>
-          <label>技能<input v-model.trim="form.skills" placeholder="Vue, Node.js, UI 設計"></label>
-          <label>自我介紹<textarea v-model.trim="form.bio" rows="3"></textarea></label>
-          <button type="submit">建立帳號</button>
+          <label>
+            姓名
+            <input v-model.trim="form.name" required autofocus autocomplete="name">
+          </label>
+          <label>
+            學號
+            <input
+              v-model.trim="form.student_id"
+              required
+              minlength="8"
+              maxlength="8"
+              pattern="D[0-9]{7}"
+              title="學號格式不正確 ex:D1234567"
+            >
+          </label>
+          <label>
+            Email
+            <input v-model.trim="form.email" type="email" required autocomplete="email">
+          </label>
+          <label>
+            密碼
+            <input
+              v-model="form.password"
+              type="password"
+              required
+              minlength="6"
+              pattern="[A-Za-z0-9]{6,}"
+              title="密碼至少 6 位，且只能使用英文字母與數字"
+              autocomplete="new-password"
+            >
+          </label>
+          <button type="submit">註冊</button>
         </form>
         <p class="auth-link">已經有帳號？<a href="/login">前往登入</a></p>
-        <p class="auth-link"><a href="/">回專案列表</a></p>
+        <p class="auth-link"><a href="/">回到首頁</a></p>
       </section>
     </main>
     <div class="toast" :class="{ show: toast }" role="status" aria-live="polite">{{ toast }}</div>

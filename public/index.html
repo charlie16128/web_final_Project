@@ -15,7 +15,7 @@
   <div id="app" v-cloak>
     <header class="topbar">
       <div>
-        <p class="eyebrow">TeamUp Campus</p>
+        <p class="eyebrow">TeamUp</p>
         <h1>課程專題組隊平台</h1>
       </div>
       <div class="user-panel">
@@ -89,12 +89,12 @@
           <label>目前人數<input v-model.number="projectForm.current_members" type="number" min="1"></label>
           <label>徵求人數<input v-model.number="projectForm.max_members" type="number" min="2" required></label>
           <label>聯絡方式<input v-model.trim="projectForm.contact" placeholder="Email / Line / Discord"></label>
-          <label class="full">需要技能<input v-model.trim="projectForm.required_skills" placeholder="前端、後端、簡報、企劃"></label>
+          <label class="full">需要技能<input v-model.trim="projectForm.required_skills"></label>
           <label class="checkbox-row full">
             <input v-model="projectForm.accepting_applications" type="checkbox">
             <span>開放申請加入</span>
           </label>
-          <label class="full">專案描述<textarea v-model.trim="projectForm.description" rows="4" required></textarea></label>
+          <label class="full">專案描述<textarea v-model.trim="projectForm.description" rows="4"></textarea></label>
           <button class="full" type="submit">送出專案</button>
         </form>
       </section>

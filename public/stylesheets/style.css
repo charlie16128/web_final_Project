@@ -204,6 +204,39 @@ label {
   padding-top: 16px;
 }
 
+.project-create-form textarea {
+  resize: none;
+}
+
+.group-edit-form {
+  display: grid;
+  gap: 16px;
+}
+
+.group-edit-form textarea {
+  resize: none;
+}
+
+.compact-fields {
+  margin-top: 12px;
+}
+
+.edit-status {
+  min-width: 180px;
+}
+
+.edit-detail-grid label {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
 .tabs {
   background: #edf1f5;
   border-radius: 6px;
@@ -469,6 +502,12 @@ label {
   padding: 24px clamp(14px, 3vw, 32px) 48px;
 }
 
+.group-side {
+  align-self: start;
+  display: grid;
+  gap: 18px;
+}
+
 .group-detail,
 .discussion-panel {
   align-self: start;
@@ -519,6 +558,23 @@ label {
   color: var(--muted);
 }
 
+.applications-list {
+  display: grid;
+  gap: 10px;
+}
+
+.applications-list .application-row {
+  align-items: start;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  padding: 12px;
+}
+
+.applications-list small {
+  color: var(--muted);
+}
+
 .auth-shell {
   align-items: center;
   display: grid;
@@ -549,6 +605,10 @@ label {
 
 .auth-card {
   box-shadow: 0 20px 55px rgba(0, 0, 0, 0.18);
+}
+
+.auth-card textarea {
+  resize: none;
 }
 
 .auth-link {

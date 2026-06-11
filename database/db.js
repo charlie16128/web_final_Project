@@ -47,6 +47,7 @@ function init() {
       'CREATE TABLE IF NOT EXISTS users (' +
         'id INTEGER PRIMARY KEY AUTOINCREMENT,' +
         'name TEXT NOT NULL,' +
+        'student_id TEXT NOT NULL UNIQUE,' +
         'class_name TEXT,' +
         'email TEXT NOT NULL UNIQUE,' +
         'password TEXT NOT NULL,' +
@@ -55,6 +56,12 @@ function init() {
         'created_at TEXT DEFAULT CURRENT_TIMESTAMP' +
       ')'
     );
+    db.run('ALTER TABLE users ADD COLUMN student_id TEXT', function(err) {
+      if (err && err.message.indexOf('duplicate column name') === -1) {
+        console.error(err);
+      }
+    });
+    db.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_student_id ON users(student_id) WHERE student_id IS NOT NULL');
     db.run(
       'CREATE TABLE IF NOT EXISTS projects (' +
         'id INTEGER PRIMARY KEY AUTOINCREMENT,' +

@@ -24,10 +24,8 @@ function publicUser(row) {
   return {
     id: row.id,
     name: row.name,
-    class_name: row.class_name,
+    student_id: row.student_id,
     email: row.email,
-    skills: row.skills,
-    bio: row.bio,
     created_at: row.created_at
   };
 }
@@ -41,21 +39,37 @@ function boolToInt(value, fallback) {
 
 router.post('/register', asyncHandler(async function(req, res) {
   var body = req.body;
-  if (!required(body.name) || !required(body.email) || !required(body.password)) {
-    res.status(400).json({ message: '姓名、Email、密碼為必填' });
+  if (!required(body.name) || !required(body.student_id) || !required(body.email) || !required(body.password)) {
+    res.status(400).json({ message: '姓名、學號、Email、密碼皆為必填' });
+    return;
+  }
+
+  if (!/^D[0-9]{7}$/.test(body.student_id)) {
+    res.status(400).json({ message: '學號格式需為 D 加 7 個數字，共 8 個字元' });
+    return;
+  }
+
+  if (!/^[A-Za-z0-9]{6,}$/.test(body.password)) {
+    res.status(400).json({ message: '密碼至少 6 位，且只能使用英文字母與數字' });
     return;
   }
 
   var exists = await db.get('SELECT id FROM users WHERE email = ?', [body.email]);
   if (exists) {
-    res.status(409).json({ message: 'Email 已註冊' });
+    res.status(409).json({ message: 'Email 已被使用' });
+    return;
+  }
+
+  exists = await db.get('SELECT id FROM users WHERE student_id = ?', [body.student_id]);
+  if (exists) {
+    res.status(409).json({ message: '學號已被使用' });
     return;
   }
 
   var hash = await bcrypt.hash(body.password, 10);
   var result = await db.run(
-    'INSERT INTO users (name, class_name, email, password, skills, bio) VALUES (?, ?, ?, ?, ?, ?)',
-    [body.name, body.class_name || '', body.email, hash, body.skills || '', body.bio || '']
+    'INSERT INTO users (name, student_id, email, password) VALUES (?, ?, ?, ?)',
+    [body.name, body.student_id, body.email, hash]
   );
   var user = await db.get('SELECT * FROM users WHERE id = ?', [result.id]);
   res.status(201).json({ token: auth.signToken(user), user: publicUser(user) });

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>群組｜TeamUp Campus</title>
+  <title>群組 - TeamUp</title>
   <link rel="stylesheet" href="/stylesheets/style.css">
   <script>
     if (!localStorage.getItem('teamup_token')) {
@@ -13,73 +13,176 @@
 </head>
 <body>
   <div id="app" v-cloak>
-    <header class="topbar compact-topbar">
+    <header class="topbar">
       <div>
-        <p class="eyebrow">TeamUp Campus</p>
-        <h1>{{ group ? group.title : '群組頁面' }}</h1>
+        <p class="eyebrow">TeamUp</p>
+        <h1>課程專題組隊平台</h1>
       </div>
       <div class="user-panel">
-        <a class="button ghost" href="/">回主畫面</a>
+        <a class="button ghost" href="/">回到首頁</a>
         <button class="ghost" type="button" @click="logout">登出</button>
       </div>
     </header>
 
     <main class="group-layout">
-      <section v-if="group" class="panel group-detail">
-        <div class="project-head">
-          <div>
-            <p class="eyebrow">{{ group.relation === 'owned' ? '我擁有的群組' : '我加入的群組' }}</p>
-            <h2>{{ group.title }}</h2>
-            <div class="meta">
-              {{ group.course_name || '未填課程' }} ·
-              {{ group.teacher_name || '未填老師' }} ·
-              建立者 {{ group.owner_name }}
+      <div v-if="group" class="group-side">
+        <section class="panel group-detail">
+          <template v-if="!showEditForm">
+            <div class="project-head">
+              <div>
+                <p class="eyebrow">{{ group.relation === 'owned' ? '我擁有的群組' : '我加入的群組' }}</p>
+                <h2>{{ group.title }}</h2>
+                <div class="meta">
+                  {{ group.course_name || '未填課程' }} /
+                  {{ group.teacher_name || '未填老師' }} /
+                  建立者：{{ group.owner_name }}
+                </div>
+              </div>
+              <div class="badge-stack">
+                <span class="badge" :class="group.status">{{ statusText(group.status) }}</span>
+                <span v-if="!group.accepting_applications" class="badge paused">暫停申請</span>
+              </div>
+            </div>
+
+            <dl class="detail-grid">
+              <div>
+                <dt>專案名稱</dt>
+                <dd>{{ group.title }}</dd>
+              </div>
+              <div>
+                <dt>人數</dt>
+                <dd>{{ group.current_members }} / {{ group.max_members }}</dd>
+              </div>
+              <div>
+                <dt>需要技能</dt>
+                <dd>{{ group.required_skills || '未填寫' }}</dd>
+              </div>
+              <div>
+                <dt>聯絡方式</dt>
+                <dd>{{ group.contact || '未填寫' }}</dd>
+              </div>
+            </dl>
+
+            <section>
+              <h3>專案描述</h3>
+              <p class="description">{{ group.description }}</p>
+            </section>
+
+            <button
+              v-if="group.relation === 'owned'"
+              class="full-width"
+              type="button"
+              @click="toggleEditForm"
+            >
+              編輯專案資料
+            </button>
+          </template>
+
+          <form
+            v-else
+            class="group-edit-form"
+            @submit.prevent="saveProject"
+          >
+            <div class="project-head">
+              <div>
+                <p class="eyebrow">編輯專案資料</p>
+                <label>
+                  專案名稱
+                  <input v-model.trim="editForm.title" required>
+                </label>
+                <div class="grid-form compact-fields">
+                  <label>
+                    課程名稱
+                    <input v-model.trim="editForm.course_name">
+                  </label>
+                  <label>
+                    老師名稱
+                    <input v-model.trim="editForm.teacher_name">
+                  </label>
+                </div>
+              </div>
+              <div class="badge-stack edit-status">
+                <label>
+                  專案狀態
+                  <select v-model="editForm.status">
+                    <option value="open">開放中</option>
+                    <option value="full">已額滿</option>
+                    <option value="closed">已關閉</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+
+            <div class="detail-grid edit-detail-grid">
+              <label>
+                目前人數
+                <input v-model.number="editForm.current_members" type="number" min="1">
+              </label>
+              <label>
+                人數上限
+                <input v-model.number="editForm.max_members" type="number" min="2" required>
+              </label>
+              <label>
+                需要技能
+                <input v-model.trim="editForm.required_skills">
+              </label>
+              <label>
+                聯絡方式
+                <input v-model.trim="editForm.contact" placeholder="Email / Line / Discord">
+              </label>
+            </div>
+
+            <label class="checkbox-row">
+              <input v-model="editForm.accepting_applications" type="checkbox">
+              <span>接受申請加入</span>
+            </label>
+
+            <label>
+              專案描述
+              <textarea v-model.trim="editForm.description" rows="4" required></textarea>
+            </label>
+
+            <div class="form-actions">
+              <button type="submit">儲存</button>
+              <button class="ghost" type="button" @click="cancelEditForm">取消</button>
+            </div>
+          </form>
+        </section>
+
+        <section v-if="group.relation === 'owned'" class="panel applications-panel">
+          <div class="section-title">
+            <h2>申請名單</h2>
+            <p>審核想加入這個專案的同學。</p>
+          </div>
+
+          <div class="applications-list">
+            <div v-if="!applications.length" class="mini-item">目前沒有待審申請。</div>
+            <div v-for="application in applications" :key="application.id" class="application-row">
+              <span>
+                <b>{{ application.applicant_name }}</b><br>
+                <small>{{ application.applicant_email }}</small><br>
+                {{ application.message || '沒有申請留言' }}
+              </span>
+              <button class="ghost" type="button" @click="updateApplication(application, 'accepted')">接受</button>
+              <button class="ghost" type="button" @click="updateApplication(application, 'rejected')">拒絕</button>
             </div>
           </div>
-          <div class="badge-stack">
-            <span class="badge" :class="group.status">{{ statusText(group.status) }}</span>
-            <span v-if="!group.accepting_applications" class="badge paused">暫停申請</span>
-          </div>
-        </div>
-
-        <dl class="detail-grid">
-          <div>
-            <dt>專案名稱</dt>
-            <dd>{{ group.title }}</dd>
-          </div>
-          <div>
-            <dt>人數</dt>
-            <dd>{{ group.current_members }} / {{ group.max_members }}</dd>
-          </div>
-          <div>
-            <dt>需要技能</dt>
-            <dd>{{ group.required_skills || '未指定' }}</dd>
-          </div>
-          <div>
-            <dt>聯絡方式</dt>
-            <dd>{{ group.contact || '未提供' }}</dd>
-          </div>
-        </dl>
-
-        <section>
-          <h3>專案描述</h3>
-          <p class="description">{{ group.description }}</p>
         </section>
-      </section>
+      </div>
 
       <section class="panel discussion-panel">
         <div class="section-title">
-          <h2>群組留言板</h2>
-          <p>這裡只開放群組建立者與已加入成員討論，訊息會自動更新。</p>
+          <h2>群組聊天</h2>
+          <p>和已加入的組員討論專題進度與分工。</p>
         </div>
 
         <form class="comment-form" @submit.prevent="createComment">
-          <input v-model.trim="commentContent" placeholder="輸入討論內容">
+          <input v-model.trim="commentContent" placeholder="輸入留言內容">
           <button type="submit">送出</button>
         </form>
 
         <div class="comments board-comments">
-          <div v-if="!comments.length" class="comment">尚無留言，開始第一則討論吧。</div>
+          <div v-if="!comments.length" class="comment">目前沒有留言。</div>
           <div v-for="comment in comments" :key="comment.id" class="comment">
             <b>{{ comment.user_name }}</b>
             <span>{{ comment.content }}</span>

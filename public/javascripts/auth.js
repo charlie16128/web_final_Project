@@ -7,11 +7,9 @@ createApp({
       mode: pageMode,
       form: pageMode === 'register' ? {
         name: '',
-        class_name: '',
+        student_id: '',
         email: '',
-        password: '',
-        skills: '',
-        bio: ''
+        password: ''
       } : {
         email: '',
         password: ''
@@ -40,7 +38,7 @@ createApp({
         vm.showToast(vm.mode === 'register' ? '註冊成功' : '登入成功');
         window.setTimeout(function() {
           window.location.href = '/';
-        }, 450);
+        }, 300);
       }).catch(function(err) {
         vm.showToast(err.message);
       });
