@@ -72,11 +72,17 @@
       </aside>
 
       <section class="panel project-form-panel">
-        <div class="section-title">
-          <h2>發起專案</h2>
-          <p>建立課程專題、畢業專案或社團作品徵人。</p>
+        <div class="project-toggle-head">
+          <div class="section-title">
+            <h2>發起專案</h2>
+            <p>按下按鈕後填寫專案資料與招募條件。</p>
+          </div>
+          <button type="button" @click="toggleProjectForm">
+            {{ showProjectForm ? '收合表單' : '發起專案' }}
+          </button>
         </div>
-        <form class="grid-form" @submit.prevent="createProject">
+
+        <form v-if="showProjectForm" class="grid-form project-create-form" @submit.prevent="createProject">
           <label>專案名稱<input v-model.trim="projectForm.title" required></label>
           <label>課程名稱<input v-model.trim="projectForm.course_name"></label>
           <label>授課老師<input v-model.trim="projectForm.teacher_name"></label>

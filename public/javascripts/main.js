@@ -11,6 +11,7 @@ createApp({
         joined: []
       },
       groupTab: 'all',
+      showProjectForm: false,
       myApplications: [],
       filters: {
         q: '',
@@ -61,6 +62,9 @@ createApp({
         accepting_applications: true,
         description: ''
       };
+    },
+    toggleProjectForm: function() {
+      this.showProjectForm = !this.showProjectForm;
     },
     api: function(path, options) {
       options = options || {};
@@ -165,6 +169,7 @@ createApp({
         body: JSON.stringify(this.projectForm)
       }).then(function() {
         vm.projectForm = vm.emptyProjectForm();
+        vm.showProjectForm = false;
         vm.showToast('專案已建立');
         vm.loadProjects();
         vm.loadGroups();

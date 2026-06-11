@@ -8,6 +8,8 @@ createApp({
       group: null,
       comments: [],
       commentContent: '',
+      commentSignature: '',
+      pollingTimer: null,
       toast: ''
     };
   },
@@ -17,7 +19,11 @@ createApp({
       return;
     }
     this.loadGroup();
-    this.loadComments();
+    this.loadComments(false);
+    this.startPolling();
+  },
+  beforeUnmount: function() {
+    this.stopPolling();
   },
   methods: {
     groupId: function() {
@@ -55,6 +61,21 @@ createApp({
       localStorage.removeItem('teamup_user');
       window.location.href = '/login';
     },
+    startPolling: function() {
+      var vm = this;
+      this.stopPolling();
+      this.pollingTimer = window.setInterval(function() {
+        if (!document.hidden) {
+          vm.loadComments(true);
+        }
+      }, 3000);
+    },
+    stopPolling: function() {
+      if (this.pollingTimer) {
+        window.clearInterval(this.pollingTimer);
+        this.pollingTimer = null;
+      }
+    },
     loadGroup: function() {
       var vm = this;
       return this.api('/groups/' + this.groupId()).then(function(data) {
@@ -67,12 +88,20 @@ createApp({
         }, 900);
       });
     },
-    loadComments: function() {
+    loadComments: function(silent) {
       var vm = this;
       return this.api('/groups/' + this.groupId() + '/comments').then(function(data) {
-        vm.comments = data.comments;
+        var signature = data.comments.map(function(comment) {
+          return comment.id + ':' + comment.created_at + ':' + comment.content;
+        }).join('|');
+        if (signature !== vm.commentSignature) {
+          vm.commentSignature = signature;
+          vm.comments = data.comments;
+        }
       }).catch(function(err) {
-        vm.showToast(err.message);
+        if (!silent) {
+          vm.showToast(err.message);
+        }
       });
     },
     createComment: function() {
@@ -87,7 +116,7 @@ createApp({
       }).then(function() {
         vm.commentContent = '';
         vm.showToast('留言已送出');
-        vm.loadComments();
+        vm.loadComments(false);
       }).catch(function(err) {
         vm.showToast(err.message);
       });
@@ -96,7 +125,24 @@ createApp({
       if (!value) {
         return '';
       }
-      return new Date(value.replace(' ', 'T')).toLocaleString('zh-TW');
+      var normalized = value.indexOf('T') >= 0 ? value : value.replace(' ', 'T');
+      if (!/[zZ]|[+-]\d\d:\d\d$/.test(normalized)) {
+        normalized += 'Z';
+      }
+      var date = new Date(normalized);
+      if (Number.isNaN(date.getTime())) {
+        return value;
+      }
+      return new Intl.DateTimeFormat('zh-TW', {
+        timeZone: 'Asia/Taipei',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      }).format(date);
     },
     statusText: function(status) {
       return {

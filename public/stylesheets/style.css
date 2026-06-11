@@ -160,6 +160,11 @@ label {
   display: grid;
   gap: 18px;
   grid-column: 1;
+  grid-row: 1 / span 3;
+}
+
+.project-form-panel {
+  align-self: start;
 }
 
 .panel {
@@ -180,6 +185,23 @@ label {
 .toolbar,
 .projects {
   grid-column: 2;
+}
+
+.project-toggle-head {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.project-toggle-head .section-title {
+  margin-bottom: 0;
+}
+
+.project-create-form {
+  border-top: 1px solid var(--line);
+  margin-top: 16px;
+  padding-top: 16px;
 }
 
 .tabs {
@@ -541,7 +563,8 @@ label {
 
 @media (max-width: 860px) {
   .topbar,
-  .project-head {
+  .project-head,
+  .project-toggle-head {
     align-items: stretch;
     flex-direction: column;
   }
