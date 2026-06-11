@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TeamUp Campus</title>
+  <link rel="stylesheet" href="/stylesheets/style.css">
+  <script>
+    if (!localStorage.getItem('teamup_token')) {
+      window.location.replace('/login');
+    }
+  </script>
+</head>
+<body>
+  <div id="app" v-cloak>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">TeamUp Campus</p>
+        <h1>課程專題組隊平台</h1>
+      </div>
+      <div class="user-panel">
+        <span>{{ user ? user.name + ' 已登入' : '尚未登入' }}</span>
+        <button v-if="user" class="ghost" type="button" @click="logout">登出</button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <aside class="sidebar">
+        <section class="panel group-panel">
+          <div class="section-title">
+            <h2>我的群組</h2>
+            <p>管理你目前擁有與加入的專案群組。</p>
+          </div>
+
+          <div class="segmented">
+            <button type="button" :class="{ active: groupTab === 'all' }" @click="groupTab = 'all'">
+              全部 {{ groupCounts.all }}
+            </button>
+            <button type="button" :class="{ active: groupTab === 'joined' }" @click="groupTab = 'joined'">
+              加入 {{ groupCounts.joined }}
+            </button>
+            <button type="button" :class="{ active: groupTab === 'owned' }" @click="groupTab = 'owned'">
+              擁有 {{ groupCounts.owned }}
+            </button>
+          </div>
+
+          <div class="group-list">
+            <div v-if="!visibleGroups.length" class="mini-item">目前沒有群組</div>
+            <a v-for="group in visibleGroups" :key="group.relation + '-' + group.id" class="group-item" :href="'/groups/' + group.id">
+              <div>
+                <strong>{{ group.title }}</strong>
+                <span>{{ group.relation === 'owned' ? '我擁有' : '已加入' }}</span>
+              </div>
+              <small>{{ statusText(group.status) }} · {{ group.current_members }} / {{ group.max_members }}</small>
+            </a>
+          </div>
+        </section>
+
+        <section class="panel applications-panel">
+          <div class="section-title">
+            <h2>我的申請</h2>
+            <p>查看你送出的申請與審核狀態。</p>
+          </div>
+          <div class="mini-list">
+            <div v-if="!myApplications.length" class="mini-item">尚無申請紀錄</div>
+            <div v-for="item in myApplications" :key="item.id" class="mini-item">
+              <b>{{ item.project_title }}</b><br>
+              {{ statusText(item.status) }}
+            </div>
+          </div>
+        </section>
+      </aside>
+
+      <section class="panel project-form-panel">
+        <div class="section-title">
+          <h2>發起專案</h2>
+          <p>建立課程專題、畢業專案或社團作品徵人。</p>
+        </div>
+        <form class="grid-form" @submit.prevent="createProject">
+          <label>專案名稱<input v-model.trim="projectForm.title" required></label>
+          <label>課程名稱<input v-model.trim="projectForm.course_name"></label>
+          <label>授課老師<input v-model.trim="projectForm.teacher_name"></label>
+          <label>目前人數<input v-model.number="projectForm.current_members" type="number" min="1"></label>
+          <label>徵求人數<input v-model.number="projectForm.max_members" type="number" min="2" required></label>
+          <label>聯絡方式<input v-model.trim="projectForm.contact" placeholder="Email / Line / Discord"></label>
+          <label class="full">需要技能<input v-model.trim="projectForm.required_skills" placeholder="前端、後端、簡報、企劃"></label>
+          <label class="checkbox-row full">
+            <input v-model="projectForm.accepting_applications" type="checkbox">
+            <span>開放申請加入</span>
+          </label>
+          <label class="full">專案描述<textarea v-model.trim="projectForm.description" rows="4" required></textarea></label>
+          <button class="full" type="submit">送出專案</button>
+        </form>
+      </section>
+
+      <section class="toolbar">
+        <input v-model.trim="filters.q" type="search" placeholder="搜尋專案、課程或技能" @input="scheduleProjectLoad">
+        <select v-model="filters.status" @change="loadProjects">
+          <option value="">全部狀態</option>
+          <option value="open">招募中</option>
+          <option value="full">已滿員</option>
+          <option value="closed">已關閉</option>
+        </select>
+        <button class="ghost" type="button" @click="loadProjects">重新整理</button>
+      </section>
+
+      <section class="projects">
+        <article v-if="!projects.length" class="project-card">
+          <p class="description">目前沒有符合條件的專案。</p>
+        </article>
+
+        <article v-for="project in projects" :key="project.id" class="project-card">
+          <div class="project-head">
+            <div>
+              <h3>{{ project.title }}</h3>
+              <div class="meta">
+                {{ project.course_name || '未填課程' }} ·
+                {{ project.teacher_name || '未填老師' }} ·
+                建立者 {{ project.owner_name }}
+              </div>
+            </div>
+            <div class="badge-stack">
+              <span class="badge" :class="project.status">{{ statusText(project.status) }}</span>
+              <span v-if="!project.accepting_applications" class="badge paused">暫停申請</span>
+            </div>
+          </div>
+
+          <p class="description">{{ project.description }}</p>
+          <div class="meta">技能：{{ project.required_skills || '未指定' }}</div>
+          <div class="meta">人數：{{ project.current_members }} / {{ project.max_members }} · 聯絡：{{ project.contact || '申請後聯絡' }}</div>
+
+          <form class="card-actions" @submit.prevent="applyProject(project)">
+            <input v-model.trim="project.applyMessage" :disabled="!canApply(project)" placeholder="申請訊息，例如我會負責前端與簡報">
+            <button type="submit" :disabled="!canApply(project)">
+              {{ project.accepting_applications ? '申請加入' : '暫停申請' }}
+            </button>
+          </form>
+
+          <form class="comment-form" @submit.prevent="createComment(project)">
+            <input v-model.trim="project.commentContent" placeholder="留言提問或補充資訊">
+            <button class="ghost" type="submit">留言</button>
+          </form>
+
+          <div class="comments">
+            <strong>留言</strong>
+            <div v-if="!project.comments.length" class="comment">尚無留言</div>
+            <div v-for="comment in project.comments" :key="comment.id" class="comment">
+              <b>{{ comment.user_name }}</b>：{{ comment.content }}
+            </div>
+          </div>
+
+          <div v-if="user && user.id === project.owner_id" class="applications">
+            <strong>待審申請名單</strong>
+            <div v-if="!project.applications.length" class="mini-item">尚無待審申請</div>
+            <div v-for="item in project.applications" :key="item.id" class="application-row">
+              <span>{{ item.applicant_name }} · {{ item.applicant_skills || '未填技能' }} · {{ item.message || '未填申請訊息' }}</span>
+              <button class="ghost" type="button" @click="updateApplication(project, item, 'accepted')">接受</button>
+              <button class="ghost" type="button" @click="updateApplication(project, item, 'rejected')">拒絕</button>
+            </div>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <div class="toast" :class="{ show: toast }" role="status" aria-live="polite">{{ toast }}</div>
+  </div>
+
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <script src="/javascripts/main.js"></script>
+</body>
+</html>

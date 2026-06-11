@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>群組｜TeamUp Campus</title>
+  <link rel="stylesheet" href="/stylesheets/style.css">
+  <script>
+    if (!localStorage.getItem('teamup_token')) {
+      window.location.replace('/login');
+    }
+  </script>
+</head>
+<body>
+  <div id="app" v-cloak>
+    <header class="topbar compact-topbar">
+      <div>
+        <p class="eyebrow">TeamUp Campus</p>
+        <h1>{{ group ? group.title : '群組頁面' }}</h1>
+      </div>
+      <div class="user-panel">
+        <a class="button ghost" href="/">回主畫面</a>
+        <button class="ghost" type="button" @click="logout">登出</button>
+      </div>
+    </header>
+
+    <main class="group-layout">
+      <section v-if="group" class="panel group-detail">
+        <div class="project-head">
+          <div>
+            <p class="eyebrow">{{ group.relation === 'owned' ? '我擁有的群組' : '我加入的群組' }}</p>
+            <h2>{{ group.title }}</h2>
+            <div class="meta">
+              {{ group.course_name || '未填課程' }} ·
+              {{ group.teacher_name || '未填老師' }} ·
+              建立者 {{ group.owner_name }}
+            </div>
+          </div>
+          <div class="badge-stack">
+            <span class="badge" :class="group.status">{{ statusText(group.status) }}</span>
+            <span v-if="!group.accepting_applications" class="badge paused">暫停申請</span>
+          </div>
+        </div>
+
+        <dl class="detail-grid">
+          <div>
+            <dt>專案名稱</dt>
+            <dd>{{ group.title }}</dd>
+          </div>
+          <div>
+            <dt>人數</dt>
+            <dd>{{ group.current_members }} / {{ group.max_members }}</dd>
+          </div>
+          <div>
+            <dt>需要技能</dt>
+            <dd>{{ group.required_skills || '未指定' }}</dd>
+          </div>
+          <div>
+            <dt>聯絡方式</dt>
+            <dd>{{ group.contact || '未提供' }}</dd>
+          </div>
+        </dl>
+
+        <section>
+          <h3>專案描述</h3>
+          <p class="description">{{ group.description }}</p>
+        </section>
+      </section>
+
+      <section class="panel discussion-panel">
+        <div class="section-title">
+          <h2>群組留言板</h2>
+          <p>這裡只開放群組建立者與已加入成員討論。</p>
+        </div>
+
+        <form class="comment-form" @submit.prevent="createComment">
+          <input v-model.trim="commentContent" placeholder="輸入討論內容">
+          <button type="submit">送出</button>
+        </form>
+
+        <div class="comments board-comments">
+          <div v-if="!comments.length" class="comment">尚無留言，開始第一則討論吧。</div>
+          <div v-for="comment in comments" :key="comment.id" class="comment">
+            <b>{{ comment.user_name }}</b>
+            <span>{{ comment.content }}</span>
+            <small>{{ formatTime(comment.created_at) }}</small>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div class="toast" :class="{ show: toast }" role="status" aria-live="polite">{{ toast }}</div>
+  </div>
+
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <script src="/javascripts/group.js"></script>
+</body>
+</html>
