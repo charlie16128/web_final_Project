@@ -2,3 +2,4 @@ node_modules/
 .env
 # database/*.sqlite (資料庫)
 npm-debug.log*
+.superpowers/
