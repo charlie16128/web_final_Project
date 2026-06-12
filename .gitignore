@@ -3,3 +3,4 @@ node_modules/
 # database/*.sqlite (資料庫)
 npm-debug.log*
 .superpowers/
+.worktrees/
