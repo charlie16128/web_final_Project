@@ -93,15 +93,44 @@ router.post('/login', asyncHandler(async function(req, res) {
 
 router.get('/users/me', auth.authRequired, asyncHandler(async function(req, res) {
   var user = await db.get('SELECT * FROM users WHERE id = ?', [req.user.id]);
+  if (!user) {
+    res.status(401).json({ message: '登入狀態已失效，請重新登入' });
+    return;
+  }
   res.json({ user: publicUser(user) });
 }));
 
 router.put('/users/me', auth.authRequired, asyncHandler(async function(req, res) {
   var body = req.body;
-  await db.run(
-    'UPDATE users SET name = ?, class_name = ?, skills = ?, bio = ? WHERE id = ?',
-    [body.name || '', body.class_name || '', body.skills || '', body.bio || '', req.user.id]
-  );
+  var currentUser = await db.get('SELECT id FROM users WHERE id = ?', [req.user.id]);
+  if (!currentUser) {
+    res.status(401).json({ message: '登入狀態已失效，請重新登入' });
+    return;
+  }
+
+  if (!required(body.email)) {
+    res.status(400).json({ message: 'Email 為必填' });
+    return;
+  }
+
+  var email = String(body.email).trim();
+  var exists = await db.get('SELECT id FROM users WHERE email = ? AND id != ?', [email, req.user.id]);
+  if (exists) {
+    res.status(409).json({ message: 'Email 已被使用' });
+    return;
+  }
+
+  if (required(body.password)) {
+    if (!/^[A-Za-z0-9]{6,}$/.test(body.password)) {
+      res.status(400).json({ message: '密碼至少 6 碼，且只能包含英文字母與數字' });
+      return;
+    }
+    var hash = await bcrypt.hash(body.password, 10);
+    await db.run('UPDATE users SET email = ?, password = ? WHERE id = ?', [email, hash, req.user.id]);
+  } else {
+    await db.run('UPDATE users SET email = ? WHERE id = ?', [email, req.user.id]);
+  }
+
   var user = await db.get('SELECT * FROM users WHERE id = ?', [req.user.id]);
   res.json({ user: publicUser(user) });
 }));

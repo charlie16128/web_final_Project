@@ -20,9 +20,38 @@
       </div>
       <div class="user-panel">
         <span>{{ user ? user.name + ' 已登入' : '尚未登入' }}</span>
+        <button v-if="user" class="ghost" type="button" @click="openAccountModal">編輯資料</button>
         <button v-if="user" class="ghost" type="button" @click="logout">登出</button>
       </div>
     </header>
+
+    <div v-if="user && showAccountModal" class="account-modal-backdrop" @click.self="closeAccountModal">
+      <form class="account-modal" role="dialog" aria-modal="true" aria-labelledby="account-modal-title" @submit.prevent="saveAccountSettings">
+        <div class="modal-head">
+          <div>
+            <p class="eyebrow">Account</p>
+            <h2 id="account-modal-title">編輯個人資料</h2>
+          </div>
+          <button class="ghost modal-close" type="button" aria-label="關閉編輯資料視窗" @click="closeAccountModal">×</button>
+        </div>
+        <label>學號
+          <input :value="user.student_id" disabled>
+        </label>
+        <label>姓名
+          <input :value="user.name" disabled>
+        </label>
+        <label>Email
+          <input v-model.trim="accountForm.email" type="email" required>
+        </label>
+        <label>新密碼
+          <input v-model.trim="accountForm.password" type="password" minlength="6" placeholder="不修改可留空">
+        </label>
+        <div class="form-actions">
+          <button class="ghost" type="button" @click="closeAccountModal">取消</button>
+          <button type="submit">儲存</button>
+        </div>
+      </form>
+    </div>
 
     <main class="layout">
       <aside class="sidebar">

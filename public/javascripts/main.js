@@ -12,6 +12,11 @@ createApp({
       },
       groupTab: 'all',
       showProjectForm: false,
+      showAccountModal: false,
+      accountForm: {
+        email: '',
+        password: ''
+      },
       myApplications: [],
       filters: {
         q: '',
@@ -48,6 +53,7 @@ createApp({
     this.loadProjects();
     this.loadMyApplications();
     this.loadGroups();
+    this.resetAccountForm();
   },
   methods: {
     emptyProjectForm: function() {
@@ -65,6 +71,18 @@ createApp({
     },
     toggleProjectForm: function() {
       this.showProjectForm = !this.showProjectForm;
+    },
+    resetAccountForm: function() {
+      this.accountForm.email = this.user && this.user.email ? this.user.email : '';
+      this.accountForm.password = '';
+    },
+    openAccountModal: function() {
+      this.resetAccountForm();
+      this.showAccountModal = true;
+    },
+    closeAccountModal: function() {
+      this.showAccountModal = false;
+      this.resetAccountForm();
     },
     api: function(path, options) {
       options = options || {};
@@ -98,6 +116,24 @@ createApp({
       localStorage.removeItem('teamup_token');
       localStorage.removeItem('teamup_user');
       window.location.href = '/login';
+    },
+    saveAccountSettings: function() {
+      var vm = this;
+      return this.api('/users/me', {
+        method: 'PUT',
+        body: JSON.stringify({
+          email: this.accountForm.email,
+          password: this.accountForm.password
+        })
+      }).then(function(data) {
+        vm.user = data.user;
+        localStorage.setItem('teamup_user', JSON.stringify(data.user));
+        vm.showAccountModal = false;
+        vm.resetAccountForm();
+        vm.showToast('個人資料已更新');
+      }).catch(function(err) {
+        vm.showToast("錯誤 : " + err.message);
+      });
     },
     scheduleProjectLoad: function() {
       window.clearTimeout(this.searchTimer);

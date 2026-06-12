@@ -1,7 +1,7 @@
 var path = require('path');
 var sqlite3 = require('sqlite3').verbose();
 
-var dbPath = path.join(__dirname, 'teamup.sqlite');
+var dbPath = process.env.TEAMUP_DB_PATH || path.join(__dirname, 'teamup.sqlite');
 var db = new sqlite3.Database(dbPath);
 
 function run(sql, params) {
@@ -36,6 +36,18 @@ function all(sql, params) {
         return;
       }
       resolve(rows);
+    });
+  });
+}
+
+function close() {
+  return new Promise(function(resolve, reject) {
+    db.close(function(err) {
+      if (err) {
+        reject(err);
+        return;
+      }
+      resolve();
     });
   });
 }
@@ -128,5 +140,6 @@ init();
 module.exports = {
   all: all,
   get: get,
-  run: run
+  run: run,
+  close: close
 };
