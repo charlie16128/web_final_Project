@@ -7,9 +7,6 @@ client/dist/
 client/.env
 server/.env
 
-server/database/*.sqlite
-server/database/*.db
-
 npm-debug.log*
 .DS_Store
 .superpowers/
