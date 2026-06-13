@@ -10,7 +10,6 @@ function clearAppModules() {
     '../database/db',
     '../middleware/auth',
     '../routes/api',
-    '../routes/pages',
     '../app'
   ].forEach(function(modulePath) {
     delete require.cache[require.resolve(modulePath)];
@@ -123,7 +122,7 @@ test('user settings update email and password while keeping name and student ID 
     var created = await register(ctx.app, '01');
 
     var updated = await request(ctx.app, 'PUT', '/api/users/me', {
-      name: '惡意改名',
+      name: '不應更新',
       student_id: 'D9999999',
       email: 'new-email@example.com',
       password: 'def456'

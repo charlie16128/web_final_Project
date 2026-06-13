@@ -1,6 +1,16 @@
 node_modules/
+client/node_modules/
+server/node_modules/
+client/dist/
+
 .env
-# database/*.sqlite (資料庫)
+client/.env
+server/.env
+
+server/database/*.sqlite
+server/database/*.db
+
 npm-debug.log*
+.DS_Store
 .superpowers/
 .worktrees/
