@@ -18,7 +18,7 @@ npm install
 npm run install:all
 ```
 
-```注意你需要分別在根目錄、/client、/server 安裝 npm install 才能跑
+注意你需要分別在根目錄、/client、/server 安裝 npm install 才能跑
 
 ## Development
 
