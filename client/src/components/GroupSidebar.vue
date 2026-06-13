@@ -6,7 +6,7 @@
         <p>快速進入你建立或已加入的專題群組。</p>
       </div>
 
-      <div class="segmented">
+      <div class="segmented group-tabs" :class="tabClass">
         <button type="button" :class="{ active: modelValue === 'all' }" @click="$emit('update:modelValue', 'all')">
           全部 {{ counts.all }}
         </button>
@@ -18,8 +18,8 @@
         </button>
       </div>
 
-      <div class="group-list">
-        <div v-if="!visibleGroups.length" class="mini-item">目前沒有群組</div>
+      <TransitionGroup :key="modelValue" name="group-list" tag="div" class="group-list">
+        <div v-if="!visibleGroups.length" key="empty" class="mini-item">目前沒有群組</div>
         <RouterLink
           v-for="group in visibleGroups"
           :key="`${group.relation}-${group.id}`"
@@ -32,7 +32,7 @@
           </div>
           <small>{{ statusText(group.status) }} | {{ group.current_members }} / {{ group.max_members }}</small>
         </RouterLink>
-      </div>
+      </TransitionGroup>
     </section>
 
     <section class="panel applications-panel">
@@ -87,4 +87,6 @@ const visibleGroups = computed(() => {
   }
   return props.groups.owned.concat(props.groups.joined)
 })
+
+const tabClass = computed(() => `tab-${props.modelValue}`)
 </script>
