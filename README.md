@@ -18,12 +18,7 @@ npm install
 npm run install:all
 ```
 
-Create environment files from the examples when needed:
-
-```bash
-cp server/.env.example server/.env
-cp client/.env.example client/.env
-```
+```注意你需要分別在根目錄、/client、/server 安裝 npm install 才能跑
 
 ## Development
 
