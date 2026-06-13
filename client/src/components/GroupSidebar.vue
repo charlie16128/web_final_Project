@@ -7,13 +7,13 @@
       </div>
 
       <div class="segmented group-tabs" :class="tabClass">
-        <button type="button" :class="{ active: modelValue === 'all' }" @click="$emit('update:modelValue', 'all')">
+        <button type="button" :class="{ active: modelValue === 'all' }" @click="changeTab('all')">
           全部 {{ counts.all }}
         </button>
-        <button type="button" :class="{ active: modelValue === 'joined' }" @click="$emit('update:modelValue', 'joined')">
+        <button type="button" :class="{ active: modelValue === 'joined' }" @click="changeTab('joined')">
           已加入 {{ counts.joined }}
         </button>
-        <button type="button" :class="{ active: modelValue === 'owned' }" @click="$emit('update:modelValue', 'owned')">
+        <button type="button" :class="{ active: modelValue === 'owned' }" @click="changeTab('owned')">
           我建立 {{ counts.owned }}
         </button>
       </div>
@@ -52,7 +52,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { statusText } from '../utils/status'
 
 const props = defineProps({
@@ -70,7 +70,9 @@ const props = defineProps({
   }
 })
 
-defineEmits(['update:modelValue'])
+const emit = defineEmits(['update:modelValue'])
+const switching = ref(false)
+let switchingTimer = 0
 
 const counts = computed(() => ({
   owned: props.groups.owned.length,
@@ -88,5 +90,21 @@ const visibleGroups = computed(() => {
   return props.groups.owned.concat(props.groups.joined)
 })
 
-const tabClass = computed(() => `tab-${props.modelValue}`)
+const tabClass = computed(() => ({
+  [`tab-${props.modelValue}`]: true,
+  'is-switching': switching.value
+}))
+
+function changeTab(tab) {
+  if (tab === props.modelValue) {
+    return
+  }
+
+  switching.value = true
+  window.clearTimeout(switchingTimer)
+  emit('update:modelValue', tab)
+  switchingTimer = window.setTimeout(() => {
+    switching.value = false
+  }, 220)
+}
 </script>

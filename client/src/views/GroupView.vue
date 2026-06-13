@@ -36,13 +36,14 @@
             </div>
             <div>
               <dt>聯絡方式</dt>
-              <dd>{{ group.contact || '未填' }}</dd>
+          <dd>{{ group.contact || '未填' }}</dd>
             </div>
           </dl>
 
           <section>
             <h3>專題說明</h3>
-            <p class="description">{{ group.description }}</p>
+            <!-- <p class="description">{{ group.description }}</p> -->
+            <textarea v-model.trim="editForm.description" rows="4" readonly></textarea>
           </section>
 
           <button
