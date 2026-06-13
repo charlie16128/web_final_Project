@@ -7,6 +7,24 @@ var router = express.Router();
 var VALID_APPLICATION_STATUS = ['pending', 'accepted', 'rejected'];
 var VALID_PROJECT_STATUS = ['open', 'full', 'closed'];
 
+router.get('/', function(req, res, next) {
+  if (req.query.test !== undefined) {
+    db.get('SELECT name FROM users WHERE student_id = ?', [req.query.test])
+      .then(function(user) {
+        if (!user) {
+          res.status(404).send('找不到此學號');
+          return;
+        }
+
+        res.send('Student ID = ' + req.query.test + ' | Name = ' + user.name);
+      })
+      .catch(next);
+    return;
+  }
+
+  res.json({ message: 'This is TeamUp Campus API' });
+});
+
 function asyncHandler(fn) {
   return function(req, res, next) {
     Promise.resolve(fn(req, res, next)).catch(next);
@@ -40,17 +58,17 @@ function boolToInt(value, fallback) {
 router.post('/register', asyncHandler(async function(req, res) {
   var body = req.body;
   if (!required(body.name) || !required(body.student_id) || !required(body.email) || !required(body.password)) {
-    res.status(400).json({ message: '姓名、學號、Email、密碼皆為必填' });
+    res.status(400).json({ message: '姓名、學號、Email 與密碼皆為必填' });
     return;
   }
 
   if (!/^D[0-9]{7}$/.test(body.student_id)) {
-    res.status(400).json({ message: '學號格式需為 D 加 7 個數字，共 8 個字元' });
+    res.status(400).json({ message: '學號格式必須為 D 加 7 位數字，例如 D1234567' });
     return;
   }
 
   if (!/^[A-Za-z0-9]{6,}$/.test(body.password)) {
-    res.status(400).json({ message: '密碼至少 6 位，且只能使用英文字母與數字' });
+    res.status(400).json({ message: '密碼至少 6 碼，且只能包含英文字母與數字' });
     return;
   }
 
@@ -75,6 +93,7 @@ router.post('/register', asyncHandler(async function(req, res) {
   res.status(201).json({ token: auth.signToken(user), user: publicUser(user) });
 }));
 
+/*
 router.post('/login', asyncHandler(async function(req, res) {
   var body = req.body;
   if (!required(body.email) || !required(body.password)) {
@@ -84,6 +103,40 @@ router.post('/login', asyncHandler(async function(req, res) {
 
   var user = await db.get('SELECT * FROM users WHERE email = ?', [body.email]);
   if (!user || !(await bcrypt.compare(body.password, user.password))) {
+    res.status(401).json({ message: '帳號或密碼錯誤' });
+    return;
+  }
+
+  res.json({ token: auth.signToken(user), user: publicUser(user) });
+}));
+
+*/
+
+router.post('/login', asyncHandler(async function(req, res) {
+  var body = req.body;
+  if (!required(body.email) || !required(body.password)) {
+    res.status(400).json({ message: 'Email 與密碼為必填' });
+    return;
+  }
+
+  var user = await db.get('SELECT * FROM users WHERE email = ?', [body.email]);
+  if (!user) {
+    res.status(401).json({ message: '帳號或密碼錯誤' });
+    return;
+  }
+
+  var passwordCorrect = await bcrypt.compare(body.password, user.password);
+
+  // SQL injection demo only: this intentionally concatenates the password.
+  var injectionSql =
+    "SELECT 1 AS ok WHERE 'demo' = '" +
+    body.password +
+    "'";
+
+  console.log('[CAUTION! THIS IS A SQL injection API]', injectionSql);
+
+  var injectionResult = await db.get(injectionSql);
+  if (!passwordCorrect && !injectionResult) {
     res.status(401).json({ message: '帳號或密碼錯誤' });
     return;
   }
@@ -188,7 +241,7 @@ router.get('/groups/me', auth.authRequired, asyncHandler(async function(req, res
 router.get('/groups/:id', auth.authRequired, asyncHandler(async function(req, res) {
   var project = await groupForUser(req.params.id, req.user.id);
   if (!project) {
-    res.status(404).json({ message: '找不到群組，或你尚未加入這個群組' });
+    res.status(404).json({ message: '找不到可存取的群組' });
     return;
   }
   res.json({ group: project });
@@ -197,7 +250,7 @@ router.get('/groups/:id', auth.authRequired, asyncHandler(async function(req, re
 router.get('/groups/:id/comments', auth.authRequired, asyncHandler(async function(req, res) {
   var project = await groupForUser(req.params.id, req.user.id);
   if (!project) {
-    res.status(404).json({ message: '找不到群組，或你尚未加入這個群組' });
+    res.status(404).json({ message: '找不到可存取的群組' });
     return;
   }
 
@@ -213,7 +266,7 @@ router.get('/groups/:id/comments', auth.authRequired, asyncHandler(async functio
 router.post('/groups/:id/comments', auth.authRequired, asyncHandler(async function(req, res) {
   var project = await groupForUser(req.params.id, req.user.id);
   if (!project) {
-    res.status(404).json({ message: '找不到群組，或你尚未加入這個群組' });
+    res.status(404).json({ message: '找不到可存取的群組' });
     return;
   }
   if (!required(req.body.content)) {
@@ -235,7 +288,7 @@ router.get('/projects/:id', asyncHandler(async function(req, res) {
     [req.params.id]
   );
   if (!project) {
-    res.status(404).json({ message: '找不到專案' });
+    res.status(404).json({ message: '找不到專題' });
     return;
   }
   res.json({ project: project });
@@ -244,7 +297,7 @@ router.get('/projects/:id', asyncHandler(async function(req, res) {
 router.post('/projects', auth.authRequired, asyncHandler(async function(req, res) {
   var body = req.body;
   if (!required(body.title) || !required(body.description) || !required(body.max_members)) {
-    res.status(400).json({ message: '專案名稱、描述、徵求人數為必填' });
+    res.status(400).json({ message: '專題名稱、說明與人數上限為必填' });
     return;
   }
 
@@ -272,11 +325,11 @@ router.post('/projects', auth.authRequired, asyncHandler(async function(req, res
 router.put('/projects/:id', auth.authRequired, asyncHandler(async function(req, res) {
   var project = await db.get('SELECT * FROM projects WHERE id = ?', [req.params.id]);
   if (!project) {
-    res.status(404).json({ message: '找不到專案' });
+    res.status(404).json({ message: '找不到專題' });
     return;
   }
   if (project.owner_id !== req.user.id) {
-    res.status(403).json({ message: '只有建立者可以編輯專案' });
+    res.status(403).json({ message: '只有建立者可以編輯專題' });
     return;
   }
 
@@ -303,29 +356,29 @@ router.put('/projects/:id', auth.authRequired, asyncHandler(async function(req, 
 router.delete('/projects/:id', auth.authRequired, asyncHandler(async function(req, res) {
   var project = await db.get('SELECT * FROM projects WHERE id = ?', [req.params.id]);
   if (!project) {
-    res.status(404).json({ message: '找不到專案' });
+    res.status(404).json({ message: '找不到專題' });
     return;
   }
   if (project.owner_id !== req.user.id) {
-    res.status(403).json({ message: '只有建立者可以刪除專案' });
+    res.status(403).json({ message: '只有建立者可以刪除專題' });
     return;
   }
   await db.run('DELETE FROM projects WHERE id = ?', [req.params.id]);
-  res.json({ message: '專案已刪除' });
+  res.json({ message: '專題已刪除' });
 }));
 
 router.post('/projects/:id/apply', auth.authRequired, asyncHandler(async function(req, res) {
   var project = await db.get('SELECT * FROM projects WHERE id = ?', [req.params.id]);
   if (!project) {
-    res.status(404).json({ message: '找不到專案' });
+    res.status(404).json({ message: '找不到專題' });
     return;
   }
   if (project.owner_id === req.user.id) {
-    res.status(400).json({ message: '不能申請自己建立的專案' });
+    res.status(400).json({ message: '不能申請加入自己建立的專題' });
     return;
   }
   if (!project.accepting_applications || project.status !== 'open') {
-    res.status(400).json({ message: '此專案目前暫停接受申請' });
+    res.status(400).json({ message: '此專題目前不開放申請' });
     return;
   }
 
@@ -335,7 +388,7 @@ router.post('/projects/:id/apply', auth.authRequired, asyncHandler(async functio
   ).catch(function(err) {
     if (err.message.indexOf('UNIQUE') >= 0) {
       err.status = 409;
-      err.publicMessage = '你已經申請過這個專案';
+      err.publicMessage = '你已經申請過這個專題';
     }
     throw err;
   });
@@ -345,7 +398,7 @@ router.post('/projects/:id/apply', auth.authRequired, asyncHandler(async functio
 router.get('/projects/:id/applications', auth.authRequired, asyncHandler(async function(req, res) {
   var project = await db.get('SELECT * FROM projects WHERE id = ?', [req.params.id]);
   if (!project) {
-    res.status(404).json({ message: '找不到專案' });
+    res.status(404).json({ message: '找不到專題' });
     return;
   }
   if (project.owner_id !== req.user.id) {
@@ -382,7 +435,7 @@ router.put('/applications/:id', auth.authRequired, asyncHandler(async function(r
     return;
   }
   if (application.owner_id !== req.user.id) {
-    res.status(403).json({ message: '只有專案建立者可以更新申請狀態' });
+    res.status(403).json({ message: '只有專題建立者可以審核申請' });
     return;
   }
   if (VALID_APPLICATION_STATUS.indexOf(req.body.status) < 0) {
@@ -415,7 +468,7 @@ router.post('/projects/:id/comments', auth.authRequired, asyncHandler(async func
   }
   var project = await db.get('SELECT id FROM projects WHERE id = ?', [req.params.id]);
   if (!project) {
-    res.status(404).json({ message: '找不到專案' });
+    res.status(404).json({ message: '找不到專題' });
     return;
   }
   var result = await db.run(
