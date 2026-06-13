@@ -93,7 +93,7 @@ router.post('/register', asyncHandler(async function(req, res) {
   res.status(201).json({ token: auth.signToken(user), user: publicUser(user) });
 }));
 
-/*
+
 router.post('/login', asyncHandler(async function(req, res) {
   var body = req.body;
   if (!required(body.email) || !required(body.password)) {
@@ -110,39 +110,39 @@ router.post('/login', asyncHandler(async function(req, res) {
   res.json({ token: auth.signToken(user), user: publicUser(user) });
 }));
 
-*/
 
-router.post('/login', asyncHandler(async function(req, res) {
-  var body = req.body;
-  if (!required(body.email) || !required(body.password)) {
-    res.status(400).json({ message: 'Email 與密碼為必填' });
-    return;
-  }
+// 這個是用來測試sql injection的/login api 請不要使用
+// router.post('/login', asyncHandler(async function(req, res) {
+//   var body = req.body;
+//   if (!required(body.email) || !required(body.password)) {
+//     res.status(400).json({ message: 'Email 與密碼為必填' });
+//     return;
+//   }
 
-  var user = await db.get('SELECT * FROM users WHERE email = ?', [body.email]);
-  if (!user) {
-    res.status(401).json({ message: '帳號或密碼錯誤' });
-    return;
-  }
+//   var user = await db.get('SELECT * FROM users WHERE email = ?', [body.email]);
+//   if (!user) {
+//     res.status(401).json({ message: '帳號或密碼錯誤' });
+//     return;
+//   }
 
-  var passwordCorrect = await bcrypt.compare(body.password, user.password);
+//   var passwordCorrect = await bcrypt.compare(body.password, user.password);
 
-  // SQL injection demo only: this intentionally concatenates the password.
-  var injectionSql =
-    "SELECT 1 AS ok WHERE 'demo' = '" +
-    body.password +
-    "'";
+//   // SQL injection demo only: this intentionally concatenates the password.
+//   var injectionSql =
+//     "SELECT 1 AS ok WHERE 'demo' = '" +
+//     body.password +
+//     "'";
 
-  console.log('[CAUTION! THIS IS A SQL injection API]', injectionSql);
+//   console.log('[CAUTION! THIS IS A SQL injection API]', injectionSql);
 
-  var injectionResult = await db.get(injectionSql);
-  if (!passwordCorrect && !injectionResult) {
-    res.status(401).json({ message: '帳號或密碼錯誤' });
-    return;
-  }
+//   var injectionResult = await db.get(injectionSql);
+//   if (!passwordCorrect && !injectionResult) {
+//     res.status(401).json({ message: '帳號或密碼錯誤' });
+//     return;
+//   }
 
-  res.json({ token: auth.signToken(user), user: publicUser(user) });
-}));
+//   res.json({ token: auth.signToken(user), user: publicUser(user) });
+// }));
 
 router.get('/users/me', auth.authRequired, asyncHandler(async function(req, res) {
   var user = await db.get('SELECT * FROM users WHERE id = ?', [req.user.id]);
