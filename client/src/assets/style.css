@@ -52,12 +52,12 @@ input:disabled {
 
 button.ghost {
   border: 1px solid var(--line);
-  background: #fff;
-  color: var(--ink);
+  background: transparent;
+  color: var(--bg);
 }
 
 button.ghost:hover {
-  background: #eef2f7;
+  background: #eef2f77e;
 }
 
 a {
@@ -108,12 +108,12 @@ label {
 
 .topbar {
   align-items: center;
-  background: #10201d;
+  background: #8c9897;
   color: white;
   display: flex;
   justify-content: space-between;
   gap: 24px;
-  padding: 28px clamp(18px, 4vw, 56px);
+  padding: 28px clamp(18px, 4vw, 56px) 16px;
 }
 
 .topbar h1 {
@@ -135,6 +135,7 @@ label {
   gap: 12px;
   justify-content: flex-end;
   min-width: 220px;
+  padding: 20px 0 0 0;
 }
 
 .layout {
@@ -158,7 +159,7 @@ label {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 18px;
+  padding: 30px;
 }
 
 .project-form-panel,
@@ -440,9 +441,7 @@ label {
 
 .auth-shell {
   align-items: center;
-  background:
-    linear-gradient(135deg, rgba(16, 32, 29, 0.92), rgba(37, 111, 99, 0.72)),
-    url("https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=1600&q=80") center / cover;
+  background: var(--bg);
   display: grid;
   gap: 24px;
   grid-template-columns: minmax(300px, 430px);
@@ -452,9 +451,13 @@ label {
 }
 
 .auth-copy {
-  color: white;
+  color: var(--ink);
   max-width: 430px;
   text-align: center;
+}
+
+.auth-copy .eyebrow {
+  color: var(--primary-dark);
 }
 
 .auth-copy h1 {
@@ -464,7 +467,7 @@ label {
 }
 
 .auth-copy p:not(.eyebrow) {
-  color: rgba(255, 255, 255, 0.84);
+  color: var(--muted);
   font-size: 19px;
   margin: 0;
 }
