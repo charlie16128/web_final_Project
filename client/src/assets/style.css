@@ -182,10 +182,10 @@ label {
 .layout {
   display: grid;
   gap: 18px;
-  grid-template-columns: minmax(260px, 360px) 1fr;
-  max-width: 1180px;
+  grid-template-columns: minmax(300px, 400px) minmax(0, 1fr);
+  width: min(1800px, calc(100% - 32px));
   margin: 0 auto;
-  padding: 24px clamp(14px, 3vw, 32px) 48px;
+  padding: 24px 0 48px;
 }
 
 .sidebar {
@@ -573,10 +573,10 @@ label {
 .group-layout {
   display: grid;
   gap: 18px;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 440px);
-  max-width: 1180px;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 480px);
+  width: min(1800px, calc(100% - 32px));
   margin: 0 auto;
-  padding: 24px clamp(14px, 3vw, 32px) 48px;
+  padding: 24px 0 48px;
 }
 
 .group-side {
@@ -685,6 +685,13 @@ button.danger:hover {
   gap: 4px;
 }
 
+.board-comments .message {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .board-comments small,
 .applications-list small {
   color: var(--muted);
@@ -717,6 +724,20 @@ button.danger:hover {
   opacity: 1;
   transform: translate(-50%, 0);
 }
+
+.message {
+  font-size: 20px;
+}
+
+.message-author {
+  font-size: 14px;
+}
+
+.message-time {
+  font-size: 11px;
+}
+
+
 
 @media (max-width: 860px) {
   .topbar,

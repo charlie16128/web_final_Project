@@ -171,9 +171,9 @@
       <div class="comments board-comments">
         <div v-if="!comments.length" class="comment">目前尚無留言</div>
         <div v-for="comment in comments" :key="comment.id" class="comment">
-          <b>{{ comment.user_name }}</b>
-          <span>{{ comment.content }}</span>
-          <small>{{ formatTime(comment.created_at) }}</small>
+          <small class="message-author">{{ comment.user_name }}</small>
+          <span class="message">{{ comment.content }}</span>
+          <small class="message-time">{{ formatTime(comment.created_at) }}</small>
         </div>
       </div>
     </section>
