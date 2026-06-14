@@ -11,8 +11,8 @@
     <div class="user-panel">
       <RouterLink v-if="backHome" class="button ghost" :to="{ name: 'home' }">回首頁</RouterLink>
       <span v-else>{{ user ? `您好 ${user.name}` : '尚未登入' }}</span>
-      <button v-if="user && showAccount" class="ghost" type="button" @click="$emit('account')">帳號設定</button>
-      <button v-if="user" class="ghost" type="button" @click="$emit('logout')">登出</button>
+      <button v-if="user && showAccount" class="appheaderbutton" type="button" @click="$emit('account')">帳號設定</button>
+      <button v-if="user" class="appheaderbutton" type="button" @click="$emit('logout')">登出</button>
     </div>
   </header>
 </template>
@@ -35,3 +35,15 @@ defineProps({
 
 defineEmits(['account', 'logout'])
 </script>
+
+<style scoped>
+.appheaderbutton {
+  color: white;
+  background-color: transparent;
+  border: 1px solid var(--line);
+}
+
+.appheaderbutton:hover{
+  background: rgb(82, 82, 82);
+}
+</style>
