@@ -41,11 +41,16 @@
         <p>追蹤送出的加入申請狀態。</p>
       </div>
       <div class="mini-list">
-        <div v-if="!applications.length" class="mini-item">尚未送出申請</div>
-        <div v-for="item in applications" :key="item.id" class="mini-item">
+        <div v-if="!pendingApplications.length" class="mini-item">尚未送出申請</div>
+        <RouterLink
+          v-for="item in pendingApplications"
+          :key="item.id"
+          class="mini-item application-link"
+          :to="{ name: 'group', params: { id: item.project_id } }"
+        >
           <b>{{ item.project_title }}</b><br>
           {{ statusText(item.status) }}
-        </div>
+        </RouterLink>
       </div>
     </section>
   </aside>
@@ -89,6 +94,8 @@ const visibleGroups = computed(() => {
   }
   return props.groups.owned.concat(props.groups.joined)
 })
+
+const pendingApplications = computed(() => props.applications.filter((item) => item.status === 'pending'))
 
 const tabClass = computed(() => ({
   [`tab-${props.modelValue}`]: true,

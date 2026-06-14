@@ -11,34 +11,36 @@
   <main class="layout">
     <GroupSidebar v-model="groupTab" :groups="groups" :applications="myApplications" />
 
-    <ProjectForm @create="createProject" />
+    <div class="main-column">
+      <ProjectForm @create="createProject" />
 
-    <section class="toolbar">
-      <input v-model.trim="filters.q" type="search" placeholder="搜尋專題、課程或技能" @input="scheduleProjectLoad">
-      <select v-model="filters.status" @change="loadProjects">
-        <option value="">全部狀態</option>
-        <option value="open">開放中</option>
-        <option value="full">已滿員</option>
-        <option value="closed">已關閉</option>
-      </select>
-      <button class="ghost" type="button" @click="loadProjects">重新整理</button>
-    </section>
+      <section class="toolbar">
+        <input v-model.trim="filters.q" type="search" placeholder="搜尋專題、課程或技能" @input="scheduleProjectLoad">
+        <select v-model="filters.status" @change="loadProjects">
+          <option value="">全部狀態</option>
+          <option value="open">開放中</option>
+          <option value="full">已滿員</option>
+          <option value="closed">已關閉</option>
+        </select>
+        <button class="ghost" type="button" @click="loadProjects">重新整理</button>
+      </section>
 
-    <section class="projects">
-      <article v-if="!projects.length" class="project-card">
-        <p class="description">目前沒有符合條件的專題。</p>
-      </article>
+      <section class="projects">
+        <article v-if="!projects.length" class="project-card">
+          <p class="description">目前沒有符合條件的專題。</p>
+        </article>
 
-      <ProjectCard
-        v-for="project in projects"
-        :key="project.id"
-        :project="project"
-        :user="user"
-        @apply="applyProject"
-        @comment="createComment"
-        @update-application="updateApplication"
-      />
-    </section>
+        <ProjectCard
+          v-for="project in projects"
+          :key="project.id"
+          :project="project"
+          :user="user"
+          @apply="applyProject"
+          @comment="createComment"
+          @update-application="updateApplication"
+        />
+      </section>
+    </div>
   </main>
 
   <ToastMessage :message="toast" />

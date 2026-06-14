@@ -9,8 +9,8 @@
       </h1>
     </div>
     <div class="user-panel">
+      <span>{{ user ? `您好 ${user.name}` : '尚未登入' }}</span>
       <RouterLink v-if="backHome" class="button ghost" :to="{ name: 'home' }">回首頁</RouterLink>
-      <span v-else>{{ user ? `您好 ${user.name}` : '尚未登入' }}</span>
       <button v-if="user && showAccount" class="appheaderbutton" type="button" @click="$emit('account')">帳號設定</button>
       <button v-if="user" class="appheaderbutton" type="button" @click="$emit('logout')">登出</button>
     </div>

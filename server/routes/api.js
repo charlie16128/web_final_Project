@@ -1,4 +1,4 @@
-var express = require('express');
+﻿var express = require('express');
 var bcrypt = require('bcrypt');
 var db = require('../database/db');
 var auth = require('../middleware/auth');
@@ -248,7 +248,7 @@ router.get('/groups/:id', auth.authRequired, asyncHandler(async function(req, re
 }));
 
 router.get('/groups/:id/comments', auth.authRequired, asyncHandler(async function(req, res) {
-  var project = await groupForUser(req.params.id, req.user.id);
+  var project = await groupMemberForUser(req.params.id, req.user.id);
   if (!project) {
     res.status(404).json({ message: '找不到可存取的群組' });
     return;
@@ -264,7 +264,7 @@ router.get('/groups/:id/comments', auth.authRequired, asyncHandler(async functio
 }));
 
 router.post('/groups/:id/comments', auth.authRequired, asyncHandler(async function(req, res) {
-  var project = await groupForUser(req.params.id, req.user.id);
+  var project = await groupMemberForUser(req.params.id, req.user.id);
   if (!project) {
     res.status(404).json({ message: '找不到可存取的群組' });
     return;
@@ -418,12 +418,45 @@ router.get('/my-applications', auth.authRequired, asyncHandler(async function(re
   var applications = await db.all(
     'SELECT applications.*, projects.title AS project_title, projects.status AS project_status ' +
       'FROM applications JOIN projects ON projects.id = applications.project_id ' +
-      'WHERE applications.user_id = ? ORDER BY applications.created_at DESC',
+      'WHERE applications.user_id = ? AND applications.status = "pending" ORDER BY applications.created_at DESC',
     [req.user.id]
   );
   res.json({ applications: applications });
 }));
 
+router.delete('/groups/:id/membership', auth.authRequired, asyncHandler(async function(req, res) {
+  var project = await db.get('SELECT * FROM projects WHERE id = ?', [req.params.id]);
+  if (!project) {
+    res.status(404).json({ message: 'Project not found' });
+    return;
+  }
+  if (project.owner_id === req.user.id) {
+    res.status(400).json({ message: 'Owners should delete the project instead' });
+    return;
+  }
+
+  var application = await db.get(
+    'SELECT * FROM applications WHERE project_id = ? AND user_id = ? AND status IN ("pending", "accepted")',
+    [req.params.id, req.user.id]
+  );
+  if (!application) {
+    res.status(404).json({ message: 'Membership not found' });
+    return;
+  }
+
+  await db.run('DELETE FROM applications WHERE id = ?', [application.id]);
+  if (application.status === 'accepted') {
+    await db.run(
+      'UPDATE projects ' +
+        'SET current_members = CASE WHEN current_members > 1 THEN current_members - 1 ELSE 1 END, ' +
+        'status = CASE WHEN status = "full" AND current_members - 1 < max_members THEN "open" ELSE status END ' +
+        'WHERE id = ?',
+      [req.params.id]
+    );
+  }
+
+  res.json({ message: 'Membership removed' });
+}));
 router.put('/applications/:id', auth.authRequired, asyncHandler(async function(req, res) {
   var application = await db.get(
     'SELECT applications.*, projects.owner_id, projects.current_members, projects.max_members FROM applications ' +
@@ -508,6 +541,23 @@ function commentById(id) {
 }
 
 function groupForUser(projectId, userId) {
+  return db.get(
+    'SELECT projects.*, users.name AS owner_name, ' +
+      'CASE ' +
+        'WHEN projects.owner_id = ? THEN "owned" ' +
+        'WHEN applications.status = "accepted" THEN "joined" ' +
+        'WHEN applications.status = "pending" THEN "pending" ' +
+      'END AS relation ' +
+      'FROM projects JOIN users ON users.id = projects.owner_id ' +
+      'LEFT JOIN applications ON applications.project_id = projects.id AND applications.user_id = ? ' +
+      'WHERE projects.id = ? AND (' +
+        'projects.owner_id = ? OR applications.status IN ("accepted", "pending")' +
+      ')',
+    [userId, userId, projectId, userId]
+  );
+}
+
+function groupMemberForUser(projectId, userId) {
   return db.get(
     'SELECT projects.*, users.name AS owner_name, ' +
       'CASE WHEN projects.owner_id = ? THEN "owned" ELSE "joined" END AS relation ' +

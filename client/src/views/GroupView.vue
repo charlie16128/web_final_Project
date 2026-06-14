@@ -7,8 +7,18 @@
         <template v-if="!showEditForm">
           <div class="project-head">
             <div>
-              <p class="eyebrow">{{ group.relation === 'owned' ? '我建立的群組' : '已加入的群組' }}</p>
-              <h2>{{ group.title }}</h2>
+              <p class="eyebrow">身分 : {{ relationLabel }}</p>
+              <div class="project-title-row">
+                <h2>{{ group.title }}</h2>
+                <button
+                  v-if="canShowMembershipAction"
+                  class="ghost danger compact-action"
+                  type="button"
+                  @click="handleMembershipAction"
+                >
+                  {{ membershipActionText }}
+                </button>
+              </div>
               <div class="meta">
                 {{ group.course_name || '未填課程' }} /
                 {{ group.teacher_name || '未填教師' }} /
@@ -16,7 +26,7 @@
               </div>
             </div>
             <div class="badge-stack">
-              <span class="badge" :class="group.status">{{ statusText(group.status) }}</span>
+              <span class="badge" :class="groupStatusClass">{{ groupStatusText }}</span>
               <span v-if="!group.accepting_applications" class="badge paused">暫停申請</span>
             </div>
           </div>
@@ -78,11 +88,14 @@
             <div class="badge-stack edit-status">
               <label>
                 專題狀態
-                <select v-model="editForm.status">
-                  <option value="open">開放中</option>
-                  <option value="full">已滿員</option>
-                  <option value="closed">已關閉</option>
-                </select>
+                <button
+                  class="status-control"
+                  :class="editStatusClass"
+                  type="button"
+                  @click="cycleProjectStatus"
+                >
+                  {{ editStatusText }}
+                </button>
               </label>
             </div>
           </div>
@@ -144,7 +157,7 @@
       </section>
     </div>
 
-    <section class="panel discussion-panel">
+    <section v-if="canUseDiscussion" class="panel discussion-panel">
       <div class="section-title">
         <h2>群組討論</h2>
         <p>和已加入的成員同步進度與問題。</p>
@@ -170,12 +183,11 @@
 </template>
 
 <script setup>
-import { onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '../services/api'
 import AppHeader from '../components/AppHeader.vue'
 import ToastMessage from '../components/ToastMessage.vue'
-import { statusText } from '../utils/status'
 
 const route = useRoute()
 const router = useRouter()
@@ -198,6 +210,52 @@ const editForm = reactive({
   contact: '',
   accepting_applications: true,
   description: ''
+})
+
+const projectStatusLabels = {
+  open: '開放中',
+  full: '已滿員',
+  closed: '已關閉'
+}
+
+const projectStatusOrder = ['open', 'full', 'closed']
+
+const groupStatusText = computed(() => projectStatusLabels[group.value?.status] || '未知狀態')
+
+const groupStatusClass = computed(() => group.value?.status || 'paused')
+
+const editStatusText = computed(() => projectStatusLabels[editForm.status] || '未知狀態')
+
+const editStatusClass = computed(() => editForm.status || 'paused')
+
+const canUseDiscussion = computed(() => (
+  group.value?.relation === 'owned' || group.value?.relation === 'joined'
+))
+
+const canShowMembershipAction = computed(() => (
+  group.value?.relation === 'owned' ||
+  group.value?.relation === 'joined' ||
+  group.value?.relation === 'pending'
+))
+
+const membershipActionText = computed(() => {
+  if (group.value?.relation === 'owned') {
+    return '解散'
+  }
+  if (group.value?.relation === 'pending') {
+    return '取消申請'
+  }
+  return '退出'
+})
+
+const relationLabel = computed(() => {
+  if (group.value?.relation === 'owned') {
+    return '擁有者'
+  }
+  if (group.value?.relation === 'pending') {
+    return '申請審核中...'
+  }
+  return '成員'
 })
 
 let pollingTimer = 0
@@ -245,6 +303,12 @@ async function loadGroup() {
   } else {
     applications.value = []
   }
+
+  if (!canUseDiscussion.value) {
+    comments.value = []
+    commentSignature.value = ''
+    stopPolling()
+  }
 }
 
 async function loadApplications() {
@@ -258,6 +322,10 @@ async function loadApplications() {
 }
 
 async function loadComments(silent = false) {
+  if (!canUseDiscussion.value) {
+    return
+  }
+
   try {
     const response = await api.get(`/groups/${route.params.id}/comments`)
     const nextComments = response.data.comments || []
@@ -276,7 +344,7 @@ async function loadComments(silent = false) {
 function startPolling() {
   stopPolling()
   pollingTimer = window.setInterval(() => {
-    if (!document.hidden) {
+    if (!document.hidden && canUseDiscussion.value) {
       loadComments(true)
     }
   }, 3000)
@@ -303,6 +371,12 @@ function cancelEditForm() {
   showEditForm.value = false
 }
 
+function cycleProjectStatus() {
+  const currentIndex = projectStatusOrder.indexOf(editForm.status)
+  const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % projectStatusOrder.length : 0
+  editForm.status = projectStatusOrder[nextIndex]
+}
+
 async function saveProject() {
   try {
     await api.put(`/projects/${group.value.id}`, editForm)
@@ -321,6 +395,39 @@ async function updateApplication(application, status) {
     await loadGroup()
   } catch (error) {
     showToast(error.response?.data?.message || '更新申請失敗')
+  }
+}
+
+async function handleMembershipAction() {
+  if (!group.value) {
+    return
+  }
+
+  const confirmed = window.confirm(
+    group.value.relation === 'owned'
+      ? '確定要解散這個群組嗎？'
+      : group.value.relation === 'pending'
+        ? '確定要取消這個申請嗎？'
+        : '確定要退出這個群組嗎？'
+  )
+  if (!confirmed) {
+    return
+  }
+
+  try {
+    if (group.value.relation === 'owned') {
+      await api.delete(`/projects/${group.value.id}`)
+      showToast('已解散群組')
+    } else {
+      await api.delete(`/groups/${group.value.id}/membership`)
+      showToast(group.value.relation === 'pending' ? '已取消申請' : '已退出群組')
+    }
+
+    window.setTimeout(() => {
+      router.replace({ name: 'home' })
+    }, 500)
+  } catch (error) {
+    showToast(error.response?.data?.message || '操作失敗')
   }
 }
 
@@ -378,8 +485,11 @@ async function logout() {
 onMounted(async () => {
   try {
     await loadUser()
-    await Promise.all([loadGroup(), loadComments()])
-    startPolling()
+    await loadGroup()
+    if (canUseDiscussion.value) {
+      await loadComments()
+      startPolling()
+    }
   } catch (error) {
     showToast(error.response?.data?.message || '群組資料載入失敗')
     window.setTimeout(() => {
