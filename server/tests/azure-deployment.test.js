@@ -68,9 +68,9 @@ function request(app, url) {
 test('root package exposes Azure build and start scripts', function() {
   var rootPackage = require('../../package.json');
 
-  assert.equal(rootPackage.scripts.postinstall, 'npm run install:all');
   assert.equal(rootPackage.scripts.build, 'npm run build --prefix client');
   assert.equal(rootPackage.scripts.start, 'npm start --prefix server');
+  assert.equal(rootPackage.scripts.postinstall, undefined);
 });
 
 test('all packages target Node.js 24 for Azure and GitHub Actions', function() {
