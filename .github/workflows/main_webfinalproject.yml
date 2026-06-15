@@ -52,4 +52,4 @@ jobs:
           app-name: 'WebFinalProject'
           slot-name: 'Production'
           package: .
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_06A0D1CBE48C4724818D7AC4F11DC530 }}
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_067A189A72234D279C69223EF3C45E13 }}
