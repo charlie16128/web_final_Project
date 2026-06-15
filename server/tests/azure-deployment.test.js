@@ -73,6 +73,16 @@ test('root package exposes Azure build and start scripts', function() {
   assert.equal(rootPackage.scripts.start, 'npm start --prefix server');
 });
 
+test('all packages target Node.js 24 for Azure and GitHub Actions', function() {
+  var rootPackage = require('../../package.json');
+  var clientPackage = require('../../client/package.json');
+  var serverPackage = require('../package.json');
+
+  assert.equal(rootPackage.engines.node, '24.x');
+  assert.equal(clientPackage.engines.node, '24.x');
+  assert.equal(serverPackage.engines.node, '24.x');
+});
+
 test('production mode requires JWT_SECRET', function() {
   var previousNodeEnv = process.env.NODE_ENV;
   var previousJwtSecret = process.env.JWT_SECRET;
