@@ -355,7 +355,7 @@ label {
   align-items: center;
   display: grid;
   gap: 10px;
-  grid-template-columns: 1fr 170px 120px;
+  grid-template-columns: 1fr 170px auto 150px;
 }
 
 .project-card {
@@ -586,10 +586,48 @@ label {
   grid-column: 2;
 }
 
-.discussion-panel {
+.group-main {
   align-self: start;
+  display: grid;
+  gap: 10px;
   grid-column: 1;
   grid-row: 1;
+  min-width: 0;
+}
+
+.summary-strip {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  display: block;
+  font-weight: 800;
+  min-height: 44px;
+  overflow: hidden;
+  padding: 0 14px;
+  text-align: left;
+  text-overflow: ellipsis;
+  transform: none;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.summary-strip:hover {
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+  transform: none;
+}
+
+.announcement-summary {
+  border-left: 4px solid var(--primary);
+}
+
+.deadline-summary {
+  border-left: 4px solid var(--warning);
+}
+
+.discussion-panel {
+  align-self: start;
 }
 
 .group-edit-form {
@@ -697,12 +735,125 @@ button.danger:hover {
   color: var(--muted);
 }
 
+.message-footer {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-start;
+}
+
+.message-footer .compact-action {
+  min-height: 30px;
+  padding: 0 10px;
+}
+
+.floating-modal-backdrop {
+  align-items: center;
+  background: rgba(15, 23, 42, 0.52);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 20px;
+  position: fixed;
+  z-index: 70;
+}
+
+.floating-modal {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.24);
+  display: grid;
+  gap: 16px;
+  max-height: calc(100vh - 40px);
+  max-width: 720px;
+  overflow-y: auto;
+  padding: 20px;
+  width: min(720px, 100%);
+}
+
+.modal-list {
+  display: grid;
+  gap: 10px;
+}
+
+.modal-item {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+
+.modal-item p {
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.inline-actions,
+.deadline-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.inline-actions {
+  justify-content: flex-start;
+}
+
 .applications-list .application-row {
   align-items: start;
   border: 1px solid var(--line);
   border-radius: 8px;
   grid-template-columns: minmax(0, 1fr) auto auto;
   padding: 12px;
+}
+
+.team-management-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.team-management-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.team-management-actions button {
+  min-height: 48px;
+  width: 100%;
+}
+
+.team-management-form {
+  display: flex;
+  flex-direction: column;
+}
+
+.team-management-form button[type="submit"] {
+  margin-top: auto;
+  width: 100%;
+}
+
+.invite-list {
+  display: grid;
+  gap: 10px;
+}
+
+.member-row {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.member-row span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
 }
 
 .toast {
@@ -737,6 +888,53 @@ button.danger:hover {
   font-size: 11px;
 }
 
+.display-name {
+  display: inline;
+}
+
+.admin-prefix {
+  color: #e53935;
+  font-weight: 700;
+  margin-right: 4px;
+}
+
+.skill-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0;
+}
+
+.skill-tag {
+  background: #eef4ff;
+  border: 1px solid #c8d8f4;
+  border-radius: 999px;
+  color: #24436f;
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1;
+  padding: 6px 10px;
+}
+
+.project-capacity {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+
+.favorite-button[aria-pressed="true"] {
+  background: #fff4d6;
+  border-color: #f2c451;
+  color: #684800;
+}
+
+.favorite-button.compact {
+  justify-self: start;
+  min-height: 34px;
+  padding: 0 12px;
+  width: auto;
+}
+
 
 
 @media (max-width: 860px) {
@@ -753,6 +951,7 @@ button.danger:hover {
 
   .layout,
   .grid-form,
+  .team-management-grid,
   .toolbar,
   .group-layout,
   .detail-grid {
@@ -763,6 +962,7 @@ button.danger:hover {
   .project-form-panel,
   .toolbar,
   .projects,
+  .group-main,
   .group-side,
   .discussion-panel,
   .sidebar,

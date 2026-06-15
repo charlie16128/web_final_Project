@@ -14,6 +14,25 @@
     <div class="main-column">
       <ProjectForm @create="createProject" />
 
+      <section v-if="myInvitations.length" class="panel invite-list">
+        <div class="section-title">
+          <h2>我的邀請</h2>
+          <p>回覆隊長邀請你加入的專題。</p>
+        </div>
+
+        <div class="applications-list">
+          <div v-for="invitation in myInvitations" :key="invitation.id" class="application-row">
+            <span>
+              <b>{{ invitation.project_title }}</b><br>
+              <small>邀請人：{{ invitation.inviter_name }}</small><br>
+              {{ invitation.message || '沒有邀請訊息' }}
+            </span>
+            <button class="ghost" type="button" @click="acceptInvitation(invitation)">接受</button>
+            <button class="ghost" type="button" @click="rejectInvitation(invitation)">拒絕</button>
+          </div>
+        </div>
+      </section>
+
       <section class="toolbar">
         <input v-model.trim="filters.q" type="search" placeholder="搜尋專題、課程或技能" @input="scheduleProjectLoad">
         <select v-model="filters.status" @change="loadProjects">
@@ -23,6 +42,10 @@
           <option value="closed">已關閉</option>
         </select>
         <button class="ghost" type="button" @click="loadProjects">重新整理</button>
+        <select v-model="filters.filter" @change="loadProjects">
+          <option value="">全部專題</option>
+          <option value="favorited">已收藏</option>
+        </select>
       </section>
 
       <section class="projects">
@@ -37,6 +60,7 @@
           :user="user"
           @apply="applyProject"
           @comment="createComment"
+          @favorite="toggleFavorite"
           @update-application="updateApplication"
         />
       </section>
@@ -61,6 +85,7 @@ const router = useRouter()
 const user = ref(JSON.parse(localStorage.getItem('teamup_user') || 'null'))
 const projects = ref([])
 const myApplications = ref([])
+const myInvitations = ref([])
 const groups = reactive({
   owned: [],
   joined: []
@@ -70,7 +95,8 @@ const showAccountModal = ref(false)
 const toast = ref('')
 const filters = reactive({
   q: '',
-  status: ''
+  status: '',
+  filter: ''
 })
 
 let toastTimer = 0
@@ -88,6 +114,7 @@ function normalizeProject(project) {
   return {
     ...project,
     accepting_applications: Boolean(project.accepting_applications),
+    is_favorited: Boolean(project.is_favorited),
     applyMessage: '',
     commentContent: '',
     comments: [],
@@ -105,7 +132,8 @@ async function loadProjects() {
   const response = await api.get('/projects', {
     params: {
       q: filters.q || undefined,
-      status: filters.status || undefined
+      status: filters.status || undefined,
+      filter: filters.filter || undefined
     }
   })
 
@@ -148,6 +176,11 @@ async function loadMyApplications() {
   myApplications.value = response.data.applications || []
 }
 
+async function loadMyInvitations() {
+  const response = await api.get('/me/invitations')
+  myInvitations.value = response.data.invitations || []
+}
+
 async function createProject(form) {
   try {
     await api.post('/projects', form)
@@ -158,6 +191,26 @@ async function createProject(form) {
   }
 }
 
+async function toggleFavorite(project) {
+  try {
+    if (project.is_favorited) {
+      await api.delete(`/projects/${project.id}/favorite`)
+      project.is_favorited = false
+      showToast('已取消收藏')
+    } else {
+      await api.post(`/projects/${project.id}/favorite`)
+      project.is_favorited = true
+      showToast('已加入收藏')
+    }
+
+    if (filters.filter === 'favorited') {
+      await loadProjects()
+    }
+  } catch (error) {
+    showToast(error.response?.data?.message || '收藏更新失敗')
+  }
+}
+
 async function applyProject(project) {
   try {
     await api.post(`/projects/${project.id}/apply`, {
@@ -165,7 +218,7 @@ async function applyProject(project) {
     })
     project.applyMessage = ''
     showToast('已送出加入申請')
-    await loadMyApplications()
+    await Promise.all([loadProjects(), loadMyApplications()])
   } catch (error) {
     showToast(error.response?.data?.message || '申請失敗')
   }
@@ -195,6 +248,26 @@ async function updateApplication(project, application, status) {
   }
 }
 
+async function acceptInvitation(invitation) {
+  try {
+    await api.post(`/invitations/${invitation.id}/accept`)
+    showToast('已接受邀請')
+    await Promise.all([loadMyInvitations(), loadProjects(), loadGroups()])
+  } catch (error) {
+    showToast(error.response?.data?.message || '接受邀請失敗')
+  }
+}
+
+async function rejectInvitation(invitation) {
+  try {
+    await api.post(`/invitations/${invitation.id}/reject`)
+    showToast('已拒絕邀請')
+    await loadMyInvitations()
+  } catch (error) {
+    showToast(error.response?.data?.message || '拒絕邀請失敗')
+  }
+}
+
 async function saveAccountSettings(form) {
   try {
     const response = await api.put('/users/me', form)
@@ -219,7 +292,8 @@ onMounted(async () => {
     await Promise.all([
       loadProjects(),
       loadGroups(),
-      loadMyApplications()
+      loadMyApplications(),
+      loadMyInvitations()
     ])
   } catch (error) {
     showToast(error.response?.data?.message || '資料載入失敗')

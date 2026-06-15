@@ -41,9 +41,18 @@ function publicUser(row) {
   }
   return {
     id: row.id,
+    username: row.username || row.name,
     name: row.name,
     student_id: row.student_id,
     email: row.email,
+    role: row.role || 'user',
+    avatar: row.avatar || '',
+    department: row.department || '',
+    grade: row.grade || '',
+    skills: row.skills || '',
+    bio: row.bio || '',
+    github_url: row.github_url || '',
+    is_suspended: row.is_suspended || 0,
     created_at: row.created_at
   };
 }
@@ -53,6 +62,92 @@ function boolToInt(value, fallback) {
     return fallback;
   }
   return value === true || value === 'true' || value === 1 || value === '1' ? 1 : 0;
+}
+
+function projectStatusFromCapacity(status, currentMembers, maxMembers, fallback) {
+  var requested = VALID_PROJECT_STATUS.indexOf(status) >= 0 ? status : (fallback || 'open');
+  var current = Number(currentMembers || 0);
+  var max = Number(maxMembers || 0);
+
+  if (requested === 'closed') {
+    return 'closed';
+  }
+  if (max > 0 && current >= max) {
+    return 'full';
+  }
+  if (requested === 'full') {
+    return 'open';
+  }
+  return requested;
+}
+
+function isAdminRole(user) {
+  return user && (user.role === 'admin' || user.role === 'super_admin');
+}
+
+function isProjectAtCapacity(project) {
+  return Number(project.current_members || 0) >= Number(project.max_members || 0);
+}
+
+async function syncProjectCapacity(projectId) {
+  var project = await db.get('SELECT * FROM projects WHERE id = ?', [projectId]);
+  if (!project) {
+    return null;
+  }
+
+  var nextStatus = projectStatusFromCapacity(project.status, project.current_members, project.max_members, project.status);
+  if (nextStatus !== project.status) {
+    await db.run('UPDATE projects SET status = ? WHERE id = ?', [nextStatus, projectId]);
+    project.status = nextStatus;
+  }
+  return project;
+}
+
+async function createNotification(userId, type, title, content, link) {
+  if (!userId) {
+    return;
+  }
+  await db.run(
+    'INSERT INTO notifications (user_id, type, title, content, link) VALUES (?, ?, ?, ?, ?)',
+    [userId, type, title, content || '', link || '']
+  );
+}
+
+async function currentUser(userId) {
+  return db.get('SELECT * FROM users WHERE id = ?', [userId]);
+}
+
+async function groupOrAdminForUser(projectId, userId) {
+  var user = await currentUser(userId);
+  if (!user) {
+    return null;
+  }
+
+  if (isAdminRole(user)) {
+    var adminProject = await db.get(
+      'SELECT projects.*, users.name AS owner_name, users.role AS owner_role, "admin" AS relation ' +
+        'FROM projects JOIN users ON users.id = projects.owner_id WHERE projects.id = ?',
+      [projectId]
+    );
+    return adminProject || null;
+  }
+
+  return groupForUser(projectId, userId);
+}
+
+async function manageableProjectForUser(projectId, userId) {
+  var user = await currentUser(userId);
+  if (!user) {
+    return null;
+  }
+
+  var project = await db.get('SELECT * FROM projects WHERE id = ?', [projectId]);
+  if (!project) {
+    return null;
+  }
+
+  project.can_manage = project.owner_id === user.id || isAdminRole(user);
+  return project;
 }
 
 router.post('/register', asyncHandler(async function(req, res) {
@@ -86,8 +181,8 @@ router.post('/register', asyncHandler(async function(req, res) {
 
   var hash = await bcrypt.hash(body.password, 10);
   var result = await db.run(
-    'INSERT INTO users (name, student_id, email, password) VALUES (?, ?, ?, ?)',
-    [body.name, body.student_id, body.email, hash]
+    'INSERT INTO users (username, name, student_id, email, password, role) VALUES (?, ?, ?, ?, ?, ?)',
+    [body.name, body.name, body.student_id, body.email, hash, 'user']
   );
   var user = await db.get('SELECT * FROM users WHERE id = ?', [result.id]);
   res.status(201).json({ token: auth.signToken(user), user: publicUser(user) });
@@ -190,8 +285,19 @@ router.put('/users/me', auth.authRequired, asyncHandler(async function(req, res)
 
 router.get('/projects', auth.optionalAuth, asyncHandler(async function(req, res) {
   var userId = req.user ? req.user.id : null;
+  var favoriteFilter = req.query.filter === 'favorited';
+  if (favoriteFilter && !userId) {
+    res.status(401).json({ message: '請先登入' });
+    return;
+  }
+
   var rows = await db.all(
-    'SELECT projects.*, users.name AS owner_name ' +
+    'SELECT projects.*, users.name AS owner_name, users.role AS owner_role, ' +
+      'CASE WHEN ? IS NULL THEN 0 ELSE EXISTS (' +
+        'SELECT 1 FROM project_favorites ' +
+        'WHERE project_favorites.project_id = projects.id ' +
+        'AND project_favorites.user_id = ?' +
+      ') END AS is_favorited ' +
       'FROM projects JOIN users ON users.id = projects.owner_id ' +
       'WHERE (? IS NULL OR projects.status = ?) ' +
       'AND (? IS NULL OR projects.title LIKE ? OR projects.course_name LIKE ? OR projects.required_skills LIKE ?) ' +
@@ -202,8 +308,15 @@ router.get('/projects', auth.optionalAuth, asyncHandler(async function(req, res)
         'AND applications.user_id = ? ' +
         'AND applications.status = "accepted"' +
       ')) ' +
+      'AND (? = 0 OR EXISTS (' +
+        'SELECT 1 FROM project_favorites ' +
+        'WHERE project_favorites.project_id = projects.id ' +
+        'AND project_favorites.user_id = ?' +
+      ')) ' +
       'ORDER BY projects.created_at DESC',
     [
+      userId,
+      userId,
       req.query.status || null,
       req.query.status || null,
       req.query.q || null,
@@ -213,21 +326,274 @@ router.get('/projects', auth.optionalAuth, asyncHandler(async function(req, res)
       userId,
       userId,
       userId,
+      userId,
+      favoriteFilter ? 1 : 0,
       userId
     ]
   );
   res.json({ projects: rows });
 }));
 
+router.post('/projects/:id/favorite', auth.authRequired, asyncHandler(async function(req, res) {
+  var project = await db.get('SELECT id FROM projects WHERE id = ?', [req.params.id]);
+  if (!project) {
+    res.status(404).json({ message: '找不到專題' });
+    return;
+  }
+
+  await db.run(
+    'INSERT OR IGNORE INTO project_favorites (user_id, project_id) VALUES (?, ?)',
+    [req.user.id, req.params.id]
+  );
+  res.json({ favorited: true });
+}));
+
+router.delete('/projects/:id/favorite', auth.authRequired, asyncHandler(async function(req, res) {
+  await db.run(
+    'DELETE FROM project_favorites WHERE user_id = ? AND project_id = ?',
+    [req.user.id, req.params.id]
+  );
+  res.json({ favorited: false });
+}));
+
+router.post('/projects/:id/invitations', auth.authRequired, asyncHandler(async function(req, res) {
+  var project = await syncProjectCapacity(req.params.id);
+  if (!project) {
+    res.status(404).json({ message: '找不到專題' });
+    return;
+  }
+  if (project.owner_id !== req.user.id) {
+    res.status(403).json({ message: '只有隊長可以邀請成員' });
+    return;
+  }
+  if (!required(req.body.user_id)) {
+    res.status(400).json({ message: '請選擇要邀請的使用者' });
+    return;
+  }
+  if (project.status !== 'open' || isProjectAtCapacity(project)) {
+    res.status(400).json({ message: '專題已滿員，不能邀請成員' });
+    return;
+  }
+
+  var inviteeId = Number(req.body.user_id);
+  if (inviteeId === req.user.id) {
+    res.status(400).json({ message: '不能邀請自己' });
+    return;
+  }
+
+  var invitee = await db.get('SELECT id, name FROM users WHERE id = ?', [inviteeId]);
+  if (!invitee) {
+    res.status(404).json({ message: '找不到使用者' });
+    return;
+  }
+
+  var existingMember = await db.get(
+    'SELECT id FROM applications WHERE project_id = ? AND user_id = ? AND status = "accepted"',
+    [req.params.id, inviteeId]
+  );
+  if (existingMember) {
+    res.status(409).json({ message: '此使用者已是專題成員' });
+    return;
+  }
+
+  var result = await db.run(
+    'INSERT INTO project_invitations (project_id, inviter_id, invitee_id, message) VALUES (?, ?, ?, ?)',
+    [req.params.id, req.user.id, inviteeId, req.body.message || '']
+  ).catch(function(err) {
+    if (err.message.indexOf('UNIQUE') >= 0) {
+      err.status = 409;
+      err.publicMessage = '已經邀請過此使用者';
+    }
+    throw err;
+  });
+
+  await createNotification(
+    inviteeId,
+    'project_invitation',
+    '收到專題邀請',
+    '你被邀請加入「' + project.title + '」',
+    '/groups/' + project.id
+  );
+
+  res.status(201).json({ invitation: await invitationById(result.id) });
+}));
+
+router.get('/me/invitations', auth.authRequired, asyncHandler(async function(req, res) {
+  var invitations = await db.all(
+    'SELECT project_invitations.*, projects.title AS project_title, projects.status AS project_status, ' +
+      'users.name AS inviter_name, users.role AS inviter_role ' +
+      'FROM project_invitations ' +
+      'JOIN projects ON projects.id = project_invitations.project_id ' +
+      'JOIN users ON users.id = project_invitations.inviter_id ' +
+      'WHERE project_invitations.invitee_id = ? AND project_invitations.status = "pending" ' +
+      'ORDER BY project_invitations.created_at DESC',
+    [req.user.id]
+  );
+  res.json({ invitations: invitations });
+}));
+
+router.post('/invitations/:id/accept', auth.authRequired, asyncHandler(async function(req, res) {
+  var invitation = await invitationById(req.params.id);
+  if (!invitation) {
+    res.status(404).json({ message: '找不到邀請' });
+    return;
+  }
+  if (invitation.invitee_id !== req.user.id) {
+    res.status(403).json({ message: '只能回覆自己的邀請' });
+    return;
+  }
+  if (invitation.status !== 'pending') {
+    res.status(400).json({ message: '此邀請已回覆' });
+    return;
+  }
+
+  var project = await syncProjectCapacity(invitation.project_id);
+  if (!project || project.status !== 'open' || isProjectAtCapacity(project)) {
+    res.status(400).json({ message: '專題已滿員，不能接受邀請' });
+    return;
+  }
+
+  var existingApplication = await db.get(
+    'SELECT * FROM applications WHERE project_id = ? AND user_id = ?',
+    [invitation.project_id, req.user.id]
+  );
+  if (existingApplication && existingApplication.status === 'accepted') {
+    res.status(409).json({ message: '你已經是專題成員' });
+    return;
+  }
+
+  if (existingApplication) {
+    await db.run('UPDATE applications SET status = "accepted" WHERE id = ?', [existingApplication.id]);
+  } else {
+    await db.run(
+      'INSERT INTO applications (project_id, user_id, message, status) VALUES (?, ?, ?, "accepted")',
+      [invitation.project_id, req.user.id, invitation.message || '']
+    );
+  }
+
+  await db.run(
+    'UPDATE projects SET current_members = current_members + 1, status = CASE WHEN current_members + 1 >= max_members THEN "full" ELSE "open" END WHERE id = ?',
+    [invitation.project_id]
+  );
+  await db.run(
+    'UPDATE project_invitations SET status = "accepted", responded_at = CURRENT_TIMESTAMP WHERE id = ?',
+    [req.params.id]
+  );
+  await createNotification(
+    invitation.inviter_id,
+    'project_invitation_accepted',
+    '邀請已接受',
+    invitation.invitee_name + ' 已加入「' + invitation.project_title + '」',
+    '/groups/' + invitation.project_id
+  );
+
+  res.json({ invitation: await invitationById(req.params.id) });
+}));
+
+router.post('/invitations/:id/reject', auth.authRequired, asyncHandler(async function(req, res) {
+  var invitation = await invitationById(req.params.id);
+  if (!invitation) {
+    res.status(404).json({ message: '找不到邀請' });
+    return;
+  }
+  if (invitation.invitee_id !== req.user.id) {
+    res.status(403).json({ message: '只能回覆自己的邀請' });
+    return;
+  }
+  if (invitation.status !== 'pending') {
+    res.status(400).json({ message: '此邀請已回覆' });
+    return;
+  }
+
+  await db.run(
+    'UPDATE project_invitations SET status = "rejected", responded_at = CURRENT_TIMESTAMP WHERE id = ?',
+    [req.params.id]
+  );
+  await createNotification(
+    invitation.inviter_id,
+    'project_invitation_rejected',
+    '邀請已拒絕',
+    invitation.invitee_name + ' 已拒絕加入「' + invitation.project_title + '」',
+    '/groups/' + invitation.project_id
+  );
+
+  res.json({ invitation: await invitationById(req.params.id) });
+}));
+
+router.post('/projects/:id/transfer-owner', auth.authRequired, asyncHandler(async function(req, res) {
+  var project = await db.get('SELECT * FROM projects WHERE id = ?', [req.params.id]);
+  if (!project) {
+    res.status(404).json({ message: '找不到專題' });
+    return;
+  }
+  if (project.owner_id !== req.user.id) {
+    res.status(403).json({ message: '只有隊長可以轉移隊長身份' });
+    return;
+  }
+  if (!required(req.body.user_id)) {
+    res.status(400).json({ message: '請選擇新隊長' });
+    return;
+  }
+
+  var nextOwnerId = Number(req.body.user_id);
+  if (nextOwnerId === req.user.id) {
+    res.status(400).json({ message: '新隊長不能是目前隊長' });
+    return;
+  }
+
+  var member = await db.get(
+    'SELECT applications.*, users.name AS member_name FROM applications ' +
+      'JOIN users ON users.id = applications.user_id ' +
+      'WHERE applications.project_id = ? AND applications.user_id = ? AND applications.status = "accepted"',
+    [req.params.id, nextOwnerId]
+  );
+  if (!member) {
+    res.status(400).json({ message: '只能轉移給目前專題成員' });
+    return;
+  }
+
+  var oldOwnerMembership = await db.get(
+    'SELECT id FROM applications WHERE project_id = ? AND user_id = ?',
+    [req.params.id, req.user.id]
+  );
+  if (oldOwnerMembership) {
+    await db.run('UPDATE applications SET status = "accepted" WHERE id = ?', [oldOwnerMembership.id]);
+  } else {
+    await db.run(
+      'INSERT INTO applications (project_id, user_id, message, status) VALUES (?, ?, ?, "accepted")',
+      [req.params.id, req.user.id, 'Former project owner']
+    );
+  }
+
+  await db.run('UPDATE projects SET owner_id = ? WHERE id = ?', [nextOwnerId, req.params.id]);
+
+  var memberIds = await db.all(
+    'SELECT user_id FROM applications WHERE project_id = ? AND status = "accepted" ' +
+      'UNION SELECT owner_id AS user_id FROM projects WHERE id = ?',
+    [req.params.id, req.params.id]
+  );
+  await Promise.all(memberIds.map(function(row) {
+    return createNotification(
+      row.user_id,
+      'project_owner_transferred',
+      '隊長已轉移',
+      '「' + project.title + '」的新隊長是 ' + member.member_name,
+      '/groups/' + project.id
+    );
+  }));
+
+  res.json({ project: await db.get('SELECT * FROM projects WHERE id = ?', [req.params.id]) });
+}));
+
 router.get('/groups/me', auth.authRequired, asyncHandler(async function(req, res) {
   var owned = await db.all(
-    'SELECT projects.*, users.name AS owner_name, "owned" AS relation ' +
+    'SELECT projects.*, users.name AS owner_name, users.role AS owner_role, "owned" AS relation ' +
       'FROM projects JOIN users ON users.id = projects.owner_id ' +
       'WHERE projects.owner_id = ? ORDER BY projects.created_at DESC',
     [req.user.id]
   );
   var joined = await db.all(
-    'SELECT projects.*, users.name AS owner_name, applications.created_at AS joined_at, "joined" AS relation ' +
+    'SELECT projects.*, users.name AS owner_name, users.role AS owner_role, applications.created_at AS joined_at, "joined" AS relation ' +
       'FROM applications ' +
       'JOIN projects ON projects.id = applications.project_id ' +
       'JOIN users ON users.id = projects.owner_id ' +
@@ -247,6 +613,74 @@ router.get('/groups/:id', auth.authRequired, asyncHandler(async function(req, re
   res.json({ group: project });
 }));
 
+router.get('/groups/:id/members', auth.authRequired, asyncHandler(async function(req, res) {
+  var project = await groupMemberForUser(req.params.id, req.user.id);
+  if (!project) {
+    res.status(404).json({ message: '找不到可存取的群組' });
+    return;
+  }
+
+  var members = await db.all(
+    'SELECT users.id, users.name, users.username, users.email, users.role, "owned" AS relation, projects.created_at AS joined_at ' +
+      'FROM projects JOIN users ON users.id = projects.owner_id ' +
+      'WHERE projects.id = ? ' +
+      'UNION ALL ' +
+      'SELECT users.id, users.name, users.username, users.email, users.role, "joined" AS relation, applications.created_at AS joined_at ' +
+      'FROM applications JOIN users ON users.id = applications.user_id ' +
+      'WHERE applications.project_id = ? AND applications.status = "accepted" AND users.id != ? ' +
+      'ORDER BY relation DESC, joined_at ASC',
+    [req.params.id, req.params.id, project.owner_id]
+  );
+  res.json({ members: members });
+}));
+
+router.delete('/groups/:id/members/:memberId', auth.authRequired, asyncHandler(async function(req, res) {
+  var project = await db.get('SELECT * FROM projects WHERE id = ?', [req.params.id]);
+  if (!project) {
+    res.status(404).json({ message: '找不到專題' });
+    return;
+  }
+  if (project.owner_id !== req.user.id) {
+    res.status(403).json({ message: '只有隊長可以移除隊員' });
+    return;
+  }
+
+  var memberId = Number(req.params.memberId);
+  if (memberId === project.owner_id) {
+    res.status(400).json({ message: '隊長不能把自己踢出隊伍' });
+    return;
+  }
+
+  var membership = await db.get(
+    'SELECT applications.*, users.name AS member_name FROM applications ' +
+      'JOIN users ON users.id = applications.user_id ' +
+      'WHERE applications.project_id = ? AND applications.user_id = ? AND applications.status = "accepted"',
+    [req.params.id, memberId]
+  );
+  if (!membership) {
+    res.status(404).json({ message: '找不到此隊員' });
+    return;
+  }
+
+  await db.run('DELETE FROM applications WHERE id = ?', [membership.id]);
+  await db.run(
+    'UPDATE projects ' +
+      'SET current_members = CASE WHEN current_members > 1 THEN current_members - 1 ELSE 1 END, ' +
+      'status = CASE WHEN current_members - 1 < max_members THEN "open" ELSE status END ' +
+      'WHERE id = ?',
+    [req.params.id]
+  );
+  await createNotification(
+    memberId,
+    'project_member_removed',
+    '已被移出隊伍',
+    '你已被移出「' + project.title + '」',
+    '/projects/' + project.id
+  );
+
+  res.json({ message: '隊員已移除', member_id: memberId });
+}));
+
 router.get('/groups/:id/comments', auth.authRequired, asyncHandler(async function(req, res) {
   var project = await groupMemberForUser(req.params.id, req.user.id);
   if (!project) {
@@ -255,7 +689,7 @@ router.get('/groups/:id/comments', auth.authRequired, asyncHandler(async functio
   }
 
   var comments = await db.all(
-    'SELECT comments.*, users.name AS user_name FROM comments ' +
+    'SELECT comments.*, users.name AS user_name, users.role AS user_role FROM comments ' +
       'JOIN users ON users.id = comments.user_id ' +
       'WHERE project_id = ? ORDER BY comments.created_at ASC',
     [req.params.id]
@@ -281,9 +715,190 @@ router.post('/groups/:id/comments', auth.authRequired, asyncHandler(async functi
   res.status(201).json({ comment: await commentById(result.id) });
 }));
 
+router.get('/groups/:id/announcements', auth.authRequired, asyncHandler(async function(req, res) {
+  var project = await groupOrAdminForUser(req.params.id, req.user.id);
+  if (!project) {
+    res.status(404).json({ message: '找不到可存取的群組' });
+    return;
+  }
+
+  var announcements = await db.all(
+    'SELECT project_announcements.*, users.name AS author_name, users.role AS author_role ' +
+      'FROM project_announcements JOIN users ON users.id = project_announcements.author_id ' +
+      'WHERE project_announcements.project_id = ? ORDER BY project_announcements.created_at DESC',
+    [req.params.id]
+  );
+  res.json({ announcements: announcements });
+}));
+
+router.post('/groups/:id/announcements', auth.authRequired, asyncHandler(async function(req, res) {
+  var project = await manageableProjectForUser(req.params.id, req.user.id);
+  if (!project) {
+    res.status(404).json({ message: '找不到專題' });
+    return;
+  }
+  if (!project.can_manage) {
+    res.status(403).json({ message: '只有隊長或管理員可以管理公告' });
+    return;
+  }
+  if (!required(req.body.content)) {
+    res.status(400).json({ message: '公告內容為必填' });
+    return;
+  }
+
+  var result = await db.run(
+    'INSERT INTO project_announcements (project_id, author_id, content) VALUES (?, ?, ?)',
+    [req.params.id, req.user.id, String(req.body.content).trim()]
+  );
+  res.status(201).json({ announcement: await announcementById(result.id) });
+}));
+
+router.put('/groups/:id/announcements/:announcementId', auth.authRequired, asyncHandler(async function(req, res) {
+  var project = await manageableProjectForUser(req.params.id, req.user.id);
+  if (!project) {
+    res.status(404).json({ message: '找不到專題' });
+    return;
+  }
+  if (!project.can_manage) {
+    res.status(403).json({ message: '只有隊長或管理員可以管理公告' });
+    return;
+  }
+  if (!required(req.body.content)) {
+    res.status(400).json({ message: '公告內容為必填' });
+    return;
+  }
+
+  var updated = await db.run(
+    'UPDATE project_announcements SET content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND project_id = ?',
+    [String(req.body.content).trim(), req.params.announcementId, req.params.id]
+  );
+  if (!updated.changes) {
+    res.status(404).json({ message: '找不到公告' });
+    return;
+  }
+  res.json({ announcement: await announcementById(req.params.announcementId) });
+}));
+
+router.delete('/groups/:id/announcements/:announcementId', auth.authRequired, asyncHandler(async function(req, res) {
+  var project = await manageableProjectForUser(req.params.id, req.user.id);
+  if (!project) {
+    res.status(404).json({ message: '找不到專題' });
+    return;
+  }
+  if (!project.can_manage) {
+    res.status(403).json({ message: '只有隊長或管理員可以管理公告' });
+    return;
+  }
+
+  var deleted = await db.run(
+    'DELETE FROM project_announcements WHERE id = ? AND project_id = ?',
+    [req.params.announcementId, req.params.id]
+  );
+  if (!deleted.changes) {
+    res.status(404).json({ message: '找不到公告' });
+    return;
+  }
+  res.json({ message: '公告已刪除' });
+}));
+
+router.get('/groups/:id/deadlines', auth.authRequired, asyncHandler(async function(req, res) {
+  var project = await groupOrAdminForUser(req.params.id, req.user.id);
+  if (!project) {
+    res.status(404).json({ message: '找不到可存取的群組' });
+    return;
+  }
+
+  var deadlines = await db.all(
+    'SELECT * FROM project_deadlines WHERE project_id = ? ORDER BY deadline_date ASC, created_at ASC',
+    [req.params.id]
+  );
+  res.json({ deadlines: deadlines });
+}));
+
+router.post('/groups/:id/deadlines', auth.authRequired, asyncHandler(async function(req, res) {
+  var project = await manageableProjectForUser(req.params.id, req.user.id);
+  if (!project) {
+    res.status(404).json({ message: '找不到專題' });
+    return;
+  }
+  if (!project.can_manage) {
+    res.status(403).json({ message: '只有隊長或管理員可以管理倒數日期' });
+    return;
+  }
+  if (!required(req.body.title) || !required(req.body.deadline_date)) {
+    res.status(400).json({ message: '倒數標題與日期為必填' });
+    return;
+  }
+
+  var result = await db.run(
+    'INSERT INTO project_deadlines (project_id, title, deadline_date, description) VALUES (?, ?, ?, ?)',
+    [
+      req.params.id,
+      String(req.body.title).trim(),
+      String(req.body.deadline_date).trim(),
+      req.body.description || ''
+    ]
+  );
+  res.status(201).json({ deadline: await deadlineById(result.id) });
+}));
+
+router.put('/groups/:id/deadlines/:deadlineId', auth.authRequired, asyncHandler(async function(req, res) {
+  var project = await manageableProjectForUser(req.params.id, req.user.id);
+  if (!project) {
+    res.status(404).json({ message: '找不到專題' });
+    return;
+  }
+  if (!project.can_manage) {
+    res.status(403).json({ message: '只有隊長或管理員可以管理倒數日期' });
+    return;
+  }
+  if (!required(req.body.title) || !required(req.body.deadline_date)) {
+    res.status(400).json({ message: '倒數標題與日期為必填' });
+    return;
+  }
+
+  var updated = await db.run(
+    'UPDATE project_deadlines SET title = ?, deadline_date = ?, description = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND project_id = ?',
+    [
+      String(req.body.title).trim(),
+      String(req.body.deadline_date).trim(),
+      req.body.description || '',
+      req.params.deadlineId,
+      req.params.id
+    ]
+  );
+  if (!updated.changes) {
+    res.status(404).json({ message: '找不到倒數日期' });
+    return;
+  }
+  res.json({ deadline: await deadlineById(req.params.deadlineId) });
+}));
+
+router.delete('/groups/:id/deadlines/:deadlineId', auth.authRequired, asyncHandler(async function(req, res) {
+  var project = await manageableProjectForUser(req.params.id, req.user.id);
+  if (!project) {
+    res.status(404).json({ message: '找不到專題' });
+    return;
+  }
+  if (!project.can_manage) {
+    res.status(403).json({ message: '只有隊長或管理員可以管理倒數日期' });
+    return;
+  }
+
+  var deleted = await db.run(
+    'DELETE FROM project_deadlines WHERE id = ? AND project_id = ?',
+    [req.params.deadlineId, req.params.id]
+  );
+  if (!deleted.changes) {
+    res.status(404).json({ message: '找不到倒數日期' });
+    return;
+  }
+  res.json({ message: '倒數日期已刪除' });
+}));
+
 router.get('/projects/:id', asyncHandler(async function(req, res) {
   var project = await db.get(
-    'SELECT projects.*, users.name AS owner_name, users.email AS owner_email ' +
+    'SELECT projects.*, users.name AS owner_name, users.role AS owner_role, users.email AS owner_email ' +
       'FROM projects JOIN users ON users.id = projects.owner_id WHERE projects.id = ?',
     [req.params.id]
   );
@@ -301,6 +916,10 @@ router.post('/projects', auth.authRequired, asyncHandler(async function(req, res
     return;
   }
 
+  var currentMembers = Number(body.current_members || 1);
+  var maxMembers = Number(body.max_members);
+  var status = projectStatusFromCapacity(body.status, currentMembers, maxMembers, 'open');
+
   var result = await db.run(
     'INSERT INTO projects (title, course_name, teacher_name, description, required_skills, current_members, max_members, status, accepting_applications, contact, owner_id) ' +
       'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -310,9 +929,9 @@ router.post('/projects', auth.authRequired, asyncHandler(async function(req, res
       body.teacher_name || '',
       body.description,
       body.required_skills || '',
-      Number(body.current_members || 1),
-      Number(body.max_members),
-      VALID_PROJECT_STATUS.indexOf(body.status) >= 0 ? body.status : 'open',
+      currentMembers,
+      maxMembers,
+      status,
       boolToInt(body.accepting_applications, 1),
       body.contact || '',
       req.user.id
@@ -334,6 +953,10 @@ router.put('/projects/:id', auth.authRequired, asyncHandler(async function(req, 
   }
 
   var body = req.body;
+  var currentMembers = Number(body.current_members || project.current_members);
+  var maxMembers = Number(body.max_members || project.max_members);
+  var status = projectStatusFromCapacity(body.status, currentMembers, maxMembers, project.status);
+
   await db.run(
     'UPDATE projects SET title = ?, course_name = ?, teacher_name = ?, description = ?, required_skills = ?, current_members = ?, max_members = ?, status = ?, accepting_applications = ?, contact = ? WHERE id = ?',
     [
@@ -342,9 +965,9 @@ router.put('/projects/:id', auth.authRequired, asyncHandler(async function(req, 
       body.teacher_name || '',
       body.description || project.description,
       body.required_skills || '',
-      Number(body.current_members || project.current_members),
-      Number(body.max_members || project.max_members),
-      VALID_PROJECT_STATUS.indexOf(body.status) >= 0 ? body.status : project.status,
+      currentMembers,
+      maxMembers,
+      status,
       boolToInt(body.accepting_applications, project.accepting_applications),
       body.contact || '',
       req.params.id
@@ -381,6 +1004,11 @@ router.post('/projects/:id/apply', auth.authRequired, asyncHandler(async functio
     res.status(400).json({ message: '此專題目前不開放申請' });
     return;
   }
+  if (Number(project.current_members) >= Number(project.max_members)) {
+    await db.run('UPDATE projects SET status = "full" WHERE id = ?', [req.params.id]);
+    res.status(400).json({ message: '此專題已額滿' });
+    return;
+  }
 
   var result = await db.run(
     'INSERT INTO applications (project_id, user_id, message) VALUES (?, ?, ?)',
@@ -406,7 +1034,7 @@ router.get('/projects/:id/applications', auth.authRequired, asyncHandler(async f
     return;
   }
   var applications = await db.all(
-    'SELECT applications.*, users.name AS applicant_name, users.email AS applicant_email, users.skills AS applicant_skills ' +
+    'SELECT applications.*, users.name AS applicant_name, users.role AS applicant_role, users.email AS applicant_email, users.skills AS applicant_skills ' +
       'FROM applications JOIN users ON users.id = applications.user_id ' +
       'WHERE project_id = ? AND applications.status = "pending" ORDER BY created_at DESC',
     [req.params.id]
@@ -475,11 +1103,20 @@ router.put('/applications/:id', auth.authRequired, asyncHandler(async function(r
     res.status(400).json({ message: '申請狀態不正確' });
     return;
   }
+  if (
+    req.body.status === 'accepted' &&
+    application.status !== 'accepted' &&
+    Number(application.current_members) >= Number(application.max_members)
+  ) {
+    await db.run('UPDATE projects SET status = "full" WHERE id = ?', [application.project_id]);
+    res.status(400).json({ message: '此專題已額滿' });
+    return;
+  }
 
   await db.run('UPDATE applications SET status = ? WHERE id = ?', [req.body.status, req.params.id]);
   if (req.body.status === 'accepted' && application.status !== 'accepted') {
     await db.run(
-      'UPDATE projects SET current_members = current_members + 1, status = CASE WHEN current_members + 1 >= max_members THEN "full" ELSE status END WHERE id = ?',
+      'UPDATE projects SET current_members = current_members + 1, status = CASE WHEN current_members + 1 >= max_members THEN "full" ELSE "open" END WHERE id = ?',
       [application.project_id]
     );
   }
@@ -488,7 +1125,7 @@ router.put('/applications/:id', auth.authRequired, asyncHandler(async function(r
 
 router.get('/projects/:id/comments', asyncHandler(async function(req, res) {
   var comments = await db.all(
-    'SELECT comments.*, users.name AS user_name FROM comments JOIN users ON users.id = comments.user_id WHERE project_id = ? ORDER BY comments.created_at ASC',
+    'SELECT comments.*, users.name AS user_name, users.role AS user_role FROM comments JOIN users ON users.id = comments.user_id WHERE project_id = ? ORDER BY comments.created_at ASC',
     [req.params.id]
   );
   res.json({ comments: comments });
@@ -527,22 +1164,49 @@ router.delete('/comments/:id', auth.authRequired, asyncHandler(async function(re
 
 function applicationById(id) {
   return db.get(
-    'SELECT applications.*, users.name AS applicant_name, projects.title AS project_title FROM applications ' +
+    'SELECT applications.*, users.name AS applicant_name, users.role AS applicant_role, projects.title AS project_title FROM applications ' +
       'JOIN users ON users.id = applications.user_id JOIN projects ON projects.id = applications.project_id WHERE applications.id = ?',
+    [id]
+  );
+}
+
+function invitationById(id) {
+  return db.get(
+    'SELECT project_invitations.*, projects.title AS project_title, projects.status AS project_status, ' +
+      'inviter.name AS inviter_name, inviter.role AS inviter_role, ' +
+      'invitee.name AS invitee_name, invitee.role AS invitee_role ' +
+      'FROM project_invitations ' +
+      'JOIN projects ON projects.id = project_invitations.project_id ' +
+      'JOIN users AS inviter ON inviter.id = project_invitations.inviter_id ' +
+      'JOIN users AS invitee ON invitee.id = project_invitations.invitee_id ' +
+      'WHERE project_invitations.id = ?',
     [id]
   );
 }
 
 function commentById(id) {
   return db.get(
-    'SELECT comments.*, users.name AS user_name FROM comments JOIN users ON users.id = comments.user_id WHERE comments.id = ?',
+    'SELECT comments.*, users.name AS user_name, users.role AS user_role FROM comments JOIN users ON users.id = comments.user_id WHERE comments.id = ?',
     [id]
   );
 }
 
+function announcementById(id) {
+  return db.get(
+    'SELECT project_announcements.*, users.name AS author_name, users.role AS author_role ' +
+      'FROM project_announcements JOIN users ON users.id = project_announcements.author_id ' +
+      'WHERE project_announcements.id = ?',
+    [id]
+  );
+}
+
+function deadlineById(id) {
+  return db.get('SELECT * FROM project_deadlines WHERE id = ?', [id]);
+}
+
 function groupForUser(projectId, userId) {
   return db.get(
-    'SELECT projects.*, users.name AS owner_name, ' +
+    'SELECT projects.*, users.name AS owner_name, users.role AS owner_role, ' +
       'CASE ' +
         'WHEN projects.owner_id = ? THEN "owned" ' +
         'WHEN applications.status = "accepted" THEN "joined" ' +
@@ -559,7 +1223,7 @@ function groupForUser(projectId, userId) {
 
 function groupMemberForUser(projectId, userId) {
   return db.get(
-    'SELECT projects.*, users.name AS owner_name, ' +
+    'SELECT projects.*, users.name AS owner_name, users.role AS owner_role, ' +
       'CASE WHEN projects.owner_id = ? THEN "owned" ELSE "joined" END AS relation ' +
       'FROM projects JOIN users ON users.id = projects.owner_id ' +
       'WHERE projects.id = ? AND (' +
