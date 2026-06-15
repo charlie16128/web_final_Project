@@ -1,7 +1,14 @@
 var path = require('path');
+var fs = require('fs');
 var sqlite3 = require('sqlite3').verbose();
 
 var dbPath = process.env.TEAMUP_DB_PATH || path.join(__dirname, 'teamup.sqlite');
+var dbDirectory = path.dirname(dbPath);
+
+if (!fs.existsSync(dbDirectory)) {
+  fs.mkdirSync(dbDirectory, { recursive: true });
+}
+
 var db = new sqlite3.Database(dbPath);
 
 function run(sql, params) {

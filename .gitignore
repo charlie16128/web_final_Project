@@ -6,6 +6,9 @@ client/dist/
 .env
 client/.env
 server/.env
+server/database/*.sqlite
+server/database/*.sqlite-shm
+server/database/*.sqlite-wal
 
 npm-debug.log*
 .DS_Store
