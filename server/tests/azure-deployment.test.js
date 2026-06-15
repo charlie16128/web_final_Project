@@ -78,6 +78,7 @@ test('all packages target Node.js 24 for Azure and GitHub Actions', function() {
   var clientPackage = require('../../client/package.json');
   var serverPackage = require('../package.json');
 
+  assert.match(rootPackage.version, /^\d+\.\d+\.\d+$/);
   assert.equal(rootPackage.engines.node, '24.x');
   assert.equal(clientPackage.engines.node, '24.x');
   assert.equal(serverPackage.engines.node, '24.x');
