@@ -50,18 +50,7 @@
       </button>
     </form>
 
-    <form class="comment-form" @submit.prevent="$emit('comment', project)">
-      <input v-model.trim="project.commentContent" placeholder="留言詢問專題細節">
-      <button class="ghost" type="submit">留言</button>
-    </form>
 
-    <!-- <div class="comments"> 
-      <strong>留言</strong>
-      <div v-if="!project.comments.length" class="comment">目前沒有留言</div>
-      <div v-for="comment in project.comments" :key="comment.id" class="comment">
-        <b><DisplayName :name="comment.user_name" :role="comment.user_role" /></b>：{{ comment.content }}
-      </div>
-    </div> -->
 
     <div v-if="isOwner" class="applications">
       <strong>待審核申請</strong>

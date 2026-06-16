@@ -14,10 +14,10 @@
       <label>姓名
         <input :value="user?.name" disabled>
       </label>
-      <label>Email
-        <input v-model.trim="form.email" type="email" required>
+      <label data-required data-error="*請輸入電子郵件">Email
+        <input v-model.trim="form.email" type="email">
       </label>
-      <label>新密碼
+      <label data-error="*密碼至少 6 碼">新密碼
         <input v-model.trim="form.password" type="password" minlength="6" placeholder="不修改可留空">
       </label>
       <div class="form-actions">

@@ -1117,7 +1117,13 @@ router.put('/applications/:id', auth.authRequired, asyncHandler(async function(r
   res.json({ application: await applicationById(req.params.id) });
 }));
 
-router.get('/projects/:id/comments', asyncHandler(async function(req, res) {
+router.get('/projects/:id/comments', auth.authRequired, asyncHandler(async function(req, res) {
+  var project = await groupMemberForUser(req.params.id, req.user.student_id);
+  if (!project) {
+    res.status(404).json({ message: '找不到可存取的群組' });
+    return;
+  }
+
   var comments = await db.all(
     'SELECT comments.*, users.name AS user_name, users.role AS user_role FROM comments JOIN users ON users.student_id = comments.user_id WHERE project_id = ? ORDER BY comments.created_at ASC',
     [req.params.id]
@@ -1126,13 +1132,13 @@ router.get('/projects/:id/comments', asyncHandler(async function(req, res) {
 }));
 
 router.post('/projects/:id/comments', auth.authRequired, asyncHandler(async function(req, res) {
-  if (!required(req.body.content)) {
-    res.status(400).json({ message: '留言內容為必填' });
+  var project = await groupMemberForUser(req.params.id, req.user.student_id);
+  if (!project) {
+    res.status(404).json({ message: '找不到可存取的群組' });
     return;
   }
-  var project = await db.get('SELECT id FROM projects WHERE id = ?', [req.params.id]);
-  if (!project) {
-    res.status(404).json({ message: '找不到專題' });
+  if (!required(req.body.content)) {
+    res.status(400).json({ message: '留言內容為必填' });
     return;
   }
   var result = await db.run(

@@ -11,18 +11,18 @@
     </div>
 
     <form v-if="open" class="grid-form project-create-form" @submit.prevent="submit">
-      <label>專題名稱<input v-model.trim="form.title" required></label>
+      <label data-required data-error="*請輸入專題名稱">專題名稱<input v-model.trim="form.title"></label>
       <label>課程名稱<input v-model.trim="form.course_name"></label>
       <label>授課教師<input v-model.trim="form.teacher_name"></label>
       <label>目前人數<input v-model.number="form.current_members" type="number" min="1"></label>
-      <label>人數上限<input v-model.number="form.max_members" type="number" min="2" required></label>
+      <label data-required data-error="*請輸入人數上限">人數上限<input v-model.number="form.max_members" type="number" min="2"></label>
       <label>聯絡方式<input v-model.trim="form.contact" placeholder="Email / Line / Discord"></label>
       <label class="full">需要技能<input v-model.trim="form.required_skills"></label>
       <label class="checkbox-row full">
         <input v-model="form.accepting_applications" type="checkbox">
         <span>開放加入申請</span>
       </label>
-      <label class="full">專題說明<textarea v-model.trim="form.description" rows="4" required></textarea></label>
+      <label data-required class="full" data-error="*請輸入專題說明">專題說明<textarea v-model.trim="form.description" rows="4"></textarea></label>
       <button class="full" type="submit">送出專題</button>
     </form>
   </section>

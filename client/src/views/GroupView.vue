@@ -68,9 +68,9 @@
           <div class="project-head">
             <div>
               <p class="eyebrow">編輯專題資料</p>
-              <label>
+              <label data-required data-error="*請輸入專題名稱">
                 專題名稱
-                <input v-model.trim="editForm.title" required>
+                <input v-model.trim="editForm.title">
               </label>
               <div class="grid-form compact-fields">
                 <label>
@@ -90,9 +90,9 @@
               目前人數
               <input :value="group.current_members" disabled>
             </label>
-            <label>
+            <label data-required data-error="*請輸入人數上限">
               人數上限
-              <input v-model.number="editForm.max_members" type="number" min="2" required>
+              <input v-model.number="editForm.max_members" type="number" min="2">
             </label>
             <label>
               需要技能
@@ -109,9 +109,9 @@
             <span>開放加入申請</span>
           </label>
 
-          <label>
+          <label data-required data-error="*請輸入專題說明">
             專題說明
-            <textarea v-model.trim="editForm.description" rows="4" required></textarea>
+            <textarea v-model.trim="editForm.description" rows="4"></textarea>
           </label>
 
           <div class="form-actions">
@@ -196,7 +196,9 @@
         </div>
 
         <form class="comment-form" @submit.prevent="createComment">
-          <input v-model.trim="commentContent" placeholder="輸入留言內容">
+          <label data-required class="inline-field" data-error="*請輸入留言內容">
+            <input v-model.trim="commentContent" placeholder="輸入留言內容">
+          </label>
           <button type="submit">送出</button>
         </form>
 
@@ -224,7 +226,7 @@
       </div>
 
       <form v-if="canManageGroupDetails" class="stack" @submit.prevent="saveAnnouncement">
-        <label>
+        <label data-required data-error="*請輸入公告內容">
           公告內容
           <textarea v-model.trim="announcementForm.content" rows="4" placeholder="輸入公告內容"></textarea>
         </label>
@@ -260,13 +262,13 @@
 
       <form v-if="canManageGroupDetails" class="stack" @submit.prevent="saveDeadline">
         <div class="grid-form compact-fields">
-          <label>
+          <label data-required data-error="*請輸入倒數標題">
             標題
-            <input v-model.trim="deadlineForm.title" required>
+            <input v-model.trim="deadlineForm.title">
           </label>
-          <label>
+          <label data-required data-error="*請選擇日期">
             日期
-            <input v-model="deadlineForm.deadline_date" type="date" required>
+            <input v-model="deadlineForm.deadline_date" type="date">
           </label>
         </div>
         <label>
@@ -304,9 +306,9 @@
       </div>
 
       <form class="stack team-management-form invite-member-form" @submit.prevent="inviteMember">
-        <label>
+        <label data-required data-error="*請輸入使用者 ID">
           邀請使用者 ID
-          <input v-model.trim="inviteForm.user_id" :disabled="isGroupFull" required>
+          <input v-model.trim="inviteForm.user_id" :disabled="isGroupFull">
         </label>
         <label>
           邀請訊息
@@ -328,9 +330,9 @@
       </div>
 
       <form class="stack team-management-form transfer-owner-form" @submit.prevent="transferOwner">
-        <label>
+        <label data-required data-error="*請選擇成員">
           新隊長
-          <select v-model="transferForm.user_id" required>
+          <select v-model="transferForm.user_id">
             <option value="" disabled>選擇現有成員</option>
             <option v-for="member in transferableMembers" :key="member.id" :value="member.id">
               {{ member.name }}

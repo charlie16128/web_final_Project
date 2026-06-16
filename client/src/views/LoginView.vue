@@ -8,8 +8,8 @@
 
     <section class="panel auth-card">
       <form class="stack" @submit.prevent="login">
-        <label>Email<input v-model.trim="form.email" type="email" required autofocus autocomplete="email"></label>
-        <label>密碼<input v-model="form.password" type="password" required autocomplete="current-password"></label>
+        <label data-required data-error="*請輸入電子郵件">Email<input v-model.trim="form.email" type="email" autofocus autocomplete="email"></label>
+        <label data-required data-error="*請輸入密碼">密碼<input v-model="form.password" type="password" autocomplete="current-password"></label>
         <button type="submit" :disabled="loading">{{ loading ? '登入中...' : '登入' }}</button>
       </form>
       <p class="auth-link">還沒有帳號？<RouterLink :to="{ name: 'register' }">前往註冊</RouterLink></p>

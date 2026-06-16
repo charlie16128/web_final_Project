@@ -8,23 +8,21 @@
 
     <section class="panel auth-card">
       <form class="stack" @submit.prevent="register">
-        <label>姓名<input v-model.trim="form.name" required autofocus autocomplete="name"></label>
-        <label>學號
+        <label data-required data-error="*請輸入姓名">姓名<input v-model.trim="form.name" autofocus autocomplete="name"></label>
+        <label data-required data-error="*學號格式為 D 加 7 位數字">學號
           <input
             v-model.trim="form.student_id"
-            required
             minlength="8"
             maxlength="8"
             pattern="D[0-9]{7}"
             title="學號格式為 D 加 7 位數字，例如 D1234567"
           >
         </label>
-        <label>Email<input v-model.trim="form.email" type="email" required autocomplete="email"></label>
-        <label>密碼
+        <label data-required data-error="*請輸入電子郵件">Email<input v-model.trim="form.email" type="email" autocomplete="email"></label>
+        <label data-required data-error="*密碼至少 6 碼，僅能使用英文或數字">密碼
           <input
             v-model="form.password"
             type="password"
-            required
             minlength="6"
             pattern="[A-Za-z0-9]{6,}"
             title="密碼至少 6 碼，限英文字母與數字"

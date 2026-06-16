@@ -114,6 +114,18 @@ async function createProject(app, token) {
   return response.body.project;
 }
 
+async function acceptMember(app, projectId, ownerToken, memberToken) {
+  var applied = await request(app, 'POST', '/api/projects/' + projectId + '/apply', {
+    message: 'Please let me join'
+  }, memberToken);
+  assert.equal(applied.status, 201);
+
+  var accepted = await request(app, 'PUT', '/api/applications/' + applied.body.application.id, {
+    status: 'accepted'
+  }, ownerToken);
+  assert.equal(accepted.status, 200);
+}
+
 test('pending applicants can open group details but not discussion, then leave after acceptance', async function() {
   var ctx = createContext();
   try {
@@ -164,6 +176,41 @@ test('pending applicants can open group details but not discussion, then leave a
     var publicProject = await request(ctx.app, 'GET', '/api/projects/' + project.id, null, applicant.token);
     assert.equal(publicProject.status, 200);
     assert.equal(publicProject.body.project.current_members, 1);
+  } finally {
+    await ctx.cleanup();
+  }
+});
+
+test('project comments API only allows group members to list and create comments', async function() {
+  var ctx = createContext();
+  try {
+    var owner = await register(ctx.app, '03');
+    var member = await register(ctx.app, '04');
+    var outsider = await register(ctx.app, '05');
+    var project = await createProject(ctx.app, owner.token);
+    await acceptMember(ctx.app, project.id, owner.token, member.token);
+
+    var anonymousList = await request(ctx.app, 'GET', '/api/projects/' + project.id + '/comments');
+    assert.equal(anonymousList.status, 401);
+
+    var outsiderList = await request(ctx.app, 'GET', '/api/projects/' + project.id + '/comments', null, outsider.token);
+    assert.equal(outsiderList.status, 404);
+
+    var outsiderCreated = await request(ctx.app, 'POST', '/api/projects/' + project.id + '/comments', {
+      content: 'I should not see this group discussion'
+    }, outsider.token);
+    assert.equal(outsiderCreated.status, 404);
+
+    var ownerCreated = await request(ctx.app, 'POST', '/api/projects/' + project.id + '/comments', {
+      content: 'Owner-only group discussion'
+    }, owner.token);
+    assert.equal(ownerCreated.status, 201);
+
+    var memberList = await request(ctx.app, 'GET', '/api/projects/' + project.id + '/comments', null, member.token);
+    assert.equal(memberList.status, 200);
+    assert.deepEqual(memberList.body.comments.map(function(comment) {
+      return comment.content;
+    }), ['Owner-only group discussion']);
   } finally {
     await ctx.cleanup();
   }

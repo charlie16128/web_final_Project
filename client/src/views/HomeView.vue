@@ -59,7 +59,6 @@
           :project="project"
           :user="user"
           @apply="applyProject"
-          @comment="createComment"
           @favorite="toggleFavorite"
           @update-application="updateApplication"
         />
@@ -139,7 +138,6 @@ async function loadProjects() {
 
   projects.value = response.data.projects.map(normalizeProject)
   await Promise.all(projects.value.map(async (project) => {
-    await loadComments(project)
     const currentUserId = user.value?.student_id || user.value?.id
     if (currentUserId === project.owner_id) {
       await loadProjectApplications(project)
@@ -160,11 +158,6 @@ async function loadGroups() {
   const response = await api.get('/groups/me')
   groups.owned = response.data.owned || []
   groups.joined = response.data.joined || []
-}
-
-async function loadComments(project) {
-  const response = await api.get(`/projects/${project.id}/comments`)
-  project.comments = response.data.comments || []
 }
 
 async function loadProjectApplications(project) {
@@ -222,19 +215,6 @@ async function applyProject(project) {
     await Promise.all([loadProjects(), loadMyApplications()])
   } catch (error) {
     showToast(error.response?.data?.message || '申請失敗')
-  }
-}
-
-async function createComment(project) {
-  try {
-    await api.post(`/projects/${project.id}/comments`, {
-      content: project.commentContent
-    })
-    project.commentContent = ''
-    showToast('留言已送出')
-    await loadComments(project)
-  } catch (error) {
-    showToast(error.response?.data?.message || '留言失敗')
   }
 }
 
