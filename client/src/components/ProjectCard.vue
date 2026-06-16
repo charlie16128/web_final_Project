@@ -11,9 +11,7 @@
       </div>
 
       <div class="badge-stack">
-        <span class="badge" :class="project.status">{{ statusText(project.status) }}</span>
-        <span v-if="isFull" class="badge full">已額滿</span>
-        <span v-if="!project.accepting_applications" class="badge paused">暫停申請</span>
+        <span class="badge" :class="statusClass">{{ statusLabel }}</span>
       </div>
     </div>
 
@@ -57,13 +55,13 @@
       <button class="ghost" type="submit">留言</button>
     </form>
 
-    <div class="comments">
+    <!-- <div class="comments"> 
       <strong>留言</strong>
       <div v-if="!project.comments.length" class="comment">目前沒有留言</div>
       <div v-for="comment in project.comments" :key="comment.id" class="comment">
         <b><DisplayName :name="comment.user_name" :role="comment.user_role" /></b>：{{ comment.content }}
       </div>
-    </div>
+    </div> -->
 
     <div v-if="isOwner" class="applications">
       <strong>待審核申請</strong>
@@ -84,7 +82,6 @@
 <script setup>
 import { computed } from 'vue'
 import DisplayName from './DisplayName.vue'
-import { statusText } from '../utils/status'
 import {
   canApplyToProject,
   capacityText,
@@ -110,6 +107,14 @@ const isOwner = computed(() => props.user && props.user.id === props.project.own
 const tags = computed(() => skillTags(props.project.required_skills))
 const isFull = computed(() => isProjectFull(props.project))
 const canApply = computed(() => canApplyToProject(props.project, props.user))
+const statusLabel = computed(() => {
+  if (isFull.value) return '已額滿'
+  return props.project.accepting_applications ? '開放中' : '暫停申請'
+})
+const statusClass = computed(() => {
+  if (isFull.value) return 'full'
+  return props.project.accepting_applications ? 'open' : 'paused'
+})
 const applyButtonText = computed(() => {
   if (!props.project.accepting_applications) return '暫停申請'
   if (isFull.value) return '已額滿'

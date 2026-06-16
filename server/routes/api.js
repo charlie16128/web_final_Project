@@ -64,21 +64,14 @@ function boolToInt(value, fallback) {
   return value === true || value === 'true' || value === 1 || value === '1' ? 1 : 0;
 }
 
-function projectStatusFromCapacity(status, currentMembers, maxMembers, fallback) {
-  var requested = VALID_PROJECT_STATUS.indexOf(status) >= 0 ? status : (fallback || 'open');
+function projectStatusFromCapacity(currentMembers, maxMembers) {
   var current = Number(currentMembers || 0);
   var max = Number(maxMembers || 0);
 
-  if (requested === 'closed') {
-    return 'closed';
-  }
   if (max > 0 && current >= max) {
     return 'full';
   }
-  if (requested === 'full') {
-    return 'open';
-  }
-  return requested;
+  return 'open';
 }
 
 function isAdminRole(user) {
@@ -95,7 +88,7 @@ async function syncProjectCapacity(projectId) {
     return null;
   }
 
-  var nextStatus = projectStatusFromCapacity(project.status, project.current_members, project.max_members, project.status);
+  var nextStatus = projectStatusFromCapacity(project.current_members, project.max_members);
   if (nextStatus !== project.status) {
     await db.run('UPDATE projects SET status = ? WHERE id = ?', [nextStatus, projectId]);
     project.status = nextStatus;
@@ -370,7 +363,7 @@ router.post('/projects/:id/invitations', auth.authRequired, asyncHandler(async f
     res.status(400).json({ message: '請選擇要邀請的使用者' });
     return;
   }
-  if (project.status !== 'open' || isProjectAtCapacity(project)) {
+  if (isProjectAtCapacity(project)) {
     res.status(400).json({ message: '專題已滿員，不能邀請成員' });
     return;
   }
@@ -448,7 +441,7 @@ router.post('/invitations/:id/accept', auth.authRequired, asyncHandler(async fun
   }
 
   var project = await syncProjectCapacity(invitation.project_id);
-  if (!project || project.status !== 'open' || isProjectAtCapacity(project)) {
+  if (!project || isProjectAtCapacity(project)) {
     res.status(400).json({ message: '專題已滿員，不能接受邀請' });
     return;
   }
@@ -918,7 +911,7 @@ router.post('/projects', auth.authRequired, asyncHandler(async function(req, res
 
   var currentMembers = Number(body.current_members || 1);
   var maxMembers = Number(body.max_members);
-  var status = projectStatusFromCapacity(body.status, currentMembers, maxMembers, 'open');
+  var status = projectStatusFromCapacity(currentMembers, maxMembers);
 
   var result = await db.run(
     'INSERT INTO projects (title, course_name, teacher_name, description, required_skills, current_members, max_members, status, accepting_applications, contact, owner_id) ' +
@@ -955,7 +948,7 @@ router.put('/projects/:id', auth.authRequired, asyncHandler(async function(req, 
   var body = req.body;
   var currentMembers = Number(body.current_members || project.current_members);
   var maxMembers = Number(body.max_members || project.max_members);
-  var status = projectStatusFromCapacity(body.status, currentMembers, maxMembers, project.status);
+  var status = projectStatusFromCapacity(currentMembers, maxMembers);
 
   await db.run(
     'UPDATE projects SET title = ?, course_name = ?, teacher_name = ?, description = ?, required_skills = ?, current_members = ?, max_members = ?, status = ?, accepting_applications = ?, contact = ? WHERE id = ?',
@@ -1000,7 +993,7 @@ router.post('/projects/:id/apply', auth.authRequired, asyncHandler(async functio
     res.status(400).json({ message: '不能申請加入自己建立的專題' });
     return;
   }
-  if (!project.accepting_applications || project.status !== 'open') {
+  if (!project.accepting_applications) {
     res.status(400).json({ message: '此專題目前不開放申請' });
     return;
   }

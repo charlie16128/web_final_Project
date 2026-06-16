@@ -73,10 +73,9 @@ function init() {
     db.run('PRAGMA foreign_keys = ON');
     db.run(
       'CREATE TABLE IF NOT EXISTS users (' +
-        'id INTEGER PRIMARY KEY AUTOINCREMENT,' +
+        'student_id TEXT PRIMARY KEY,' +
         'username TEXT,' +
         'name TEXT NOT NULL,' +
-        'student_id TEXT NOT NULL UNIQUE,' +
         'class_name TEXT,' +
         'email TEXT NOT NULL UNIQUE,' +
         'password TEXT NOT NULL,' +
@@ -91,7 +90,6 @@ function init() {
         'created_at TEXT DEFAULT CURRENT_TIMESTAMP' +
       ')'
     );
-    addColumn('users', 'student_id TEXT');
     addColumn('users', 'username TEXT');
     addColumn('users', 'role TEXT DEFAULT "user"');
     addColumn('users', 'avatar TEXT');
@@ -102,7 +100,6 @@ function init() {
     db.run('UPDATE users SET username = name WHERE username IS NULL OR username = ""');
     db.run('UPDATE users SET role = "user" WHERE role IS NULL OR role = ""');
     db.run('UPDATE users SET is_suspended = 0 WHERE is_suspended IS NULL');
-    db.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_student_id ON users(student_id) WHERE student_id IS NOT NULL');
     db.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(username) WHERE username IS NOT NULL');
     db.run(
       'CREATE TABLE IF NOT EXISTS projects (' +
@@ -117,9 +114,9 @@ function init() {
         'status TEXT DEFAULT "open",' +
         'accepting_applications INTEGER DEFAULT 1,' +
         'contact TEXT,' +
-        'owner_id INTEGER NOT NULL,' +
+        'owner_id TEXT NOT NULL,' +
         'created_at TEXT DEFAULT CURRENT_TIMESTAMP,' +
-        'FOREIGN KEY(owner_id) REFERENCES users(id) ON DELETE CASCADE' +
+        'FOREIGN KEY(owner_id) REFERENCES users(student_id) ON DELETE CASCADE' +
       ')'
     );
     db.run('ALTER TABLE projects ADD COLUMN accepting_applications INTEGER DEFAULT 1', function(err) {
@@ -131,45 +128,45 @@ function init() {
       'CREATE TABLE IF NOT EXISTS applications (' +
         'id INTEGER PRIMARY KEY AUTOINCREMENT,' +
         'project_id INTEGER NOT NULL,' +
-        'user_id INTEGER NOT NULL,' +
+        'user_id TEXT NOT NULL,' +
         'message TEXT,' +
         'status TEXT DEFAULT "pending",' +
         'created_at TEXT DEFAULT CURRENT_TIMESTAMP,' +
         'UNIQUE(project_id, user_id),' +
         'FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE,' +
-        'FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE' +
+        'FOREIGN KEY(user_id) REFERENCES users(student_id) ON DELETE CASCADE' +
       ')'
     );
     db.run(
       'CREATE TABLE IF NOT EXISTS comments (' +
         'id INTEGER PRIMARY KEY AUTOINCREMENT,' +
         'project_id INTEGER NOT NULL,' +
-        'user_id INTEGER NOT NULL,' +
+        'user_id TEXT NOT NULL,' +
         'content TEXT NOT NULL,' +
         'created_at TEXT DEFAULT CURRENT_TIMESTAMP,' +
         'FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE,' +
-        'FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE' +
+        'FOREIGN KEY(user_id) REFERENCES users(student_id) ON DELETE CASCADE' +
       ')'
     );
     db.run(
       'CREATE TABLE IF NOT EXISTS favorites (' +
         'id INTEGER PRIMARY KEY AUTOINCREMENT,' +
         'project_id INTEGER NOT NULL,' +
-        'user_id INTEGER NOT NULL,' +
+        'user_id TEXT NOT NULL,' +
         'created_at TEXT DEFAULT CURRENT_TIMESTAMP,' +
         'UNIQUE(project_id, user_id),' +
         'FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE,' +
-        'FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE' +
+        'FOREIGN KEY(user_id) REFERENCES users(student_id) ON DELETE CASCADE' +
       ')'
     );
     db.run(
       'CREATE TABLE IF NOT EXISTS project_favorites (' +
         'id INTEGER PRIMARY KEY AUTOINCREMENT,' +
-        'user_id INTEGER NOT NULL,' +
+        'user_id TEXT NOT NULL,' +
         'project_id INTEGER NOT NULL,' +
         'created_at TEXT DEFAULT CURRENT_TIMESTAMP,' +
         'UNIQUE(user_id, project_id),' +
-        'FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,' +
+        'FOREIGN KEY(user_id) REFERENCES users(student_id) ON DELETE CASCADE,' +
         'FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE' +
       ')'
     );
@@ -177,12 +174,12 @@ function init() {
       'CREATE TABLE IF NOT EXISTS project_announcements (' +
         'id INTEGER PRIMARY KEY AUTOINCREMENT,' +
         'project_id INTEGER NOT NULL,' +
-        'author_id INTEGER NOT NULL,' +
+        'author_id TEXT NOT NULL,' +
         'content TEXT NOT NULL,' +
         'created_at TEXT DEFAULT CURRENT_TIMESTAMP,' +
         'updated_at TEXT,' +
         'FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE,' +
-        'FOREIGN KEY(author_id) REFERENCES users(id) ON DELETE CASCADE' +
+        'FOREIGN KEY(author_id) REFERENCES users(student_id) ON DELETE CASCADE' +
       ')'
     );
     db.run(
@@ -201,29 +198,29 @@ function init() {
       'CREATE TABLE IF NOT EXISTS project_invitations (' +
         'id INTEGER PRIMARY KEY AUTOINCREMENT,' +
         'project_id INTEGER NOT NULL,' +
-        'inviter_id INTEGER NOT NULL,' +
-        'invitee_id INTEGER NOT NULL,' +
+        'inviter_id TEXT NOT NULL,' +
+        'invitee_id TEXT NOT NULL,' +
         'message TEXT,' +
         'status TEXT DEFAULT "pending",' +
         'created_at TEXT DEFAULT CURRENT_TIMESTAMP,' +
         'responded_at TEXT,' +
         'UNIQUE(project_id, invitee_id),' +
         'FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE,' +
-        'FOREIGN KEY(inviter_id) REFERENCES users(id) ON DELETE CASCADE,' +
-        'FOREIGN KEY(invitee_id) REFERENCES users(id) ON DELETE CASCADE' +
+        'FOREIGN KEY(inviter_id) REFERENCES users(student_id) ON DELETE CASCADE,' +
+        'FOREIGN KEY(invitee_id) REFERENCES users(student_id) ON DELETE CASCADE' +
       ')'
     );
     db.run(
       'CREATE TABLE IF NOT EXISTS notifications (' +
         'id INTEGER PRIMARY KEY AUTOINCREMENT,' +
-        'user_id INTEGER NOT NULL,' +
+        'user_id TEXT NOT NULL,' +
         'type TEXT NOT NULL,' +
         'title TEXT NOT NULL,' +
         'content TEXT,' +
         'link TEXT,' +
         'is_read INTEGER DEFAULT 0,' +
         'created_at TEXT DEFAULT CURRENT_TIMESTAMP,' +
-        'FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE' +
+        'FOREIGN KEY(user_id) REFERENCES users(student_id) ON DELETE CASCADE' +
       ')'
     );
     seedSuperAdmin();

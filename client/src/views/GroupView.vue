@@ -27,7 +27,6 @@
             </div>
             <div class="badge-stack">
               <span class="badge" :class="groupStatusClass">{{ groupStatusText }}</span>
-              <span v-if="!group.accepting_applications" class="badge paused">暫停申請</span>
             </div>
           </div>
 
@@ -84,25 +83,12 @@
                 </label>
               </div>
             </div>
-            <div class="badge-stack edit-status">
-              <label>
-                專題狀態
-                <button
-                  class="status-control"
-                  :class="editStatusClass"
-                  type="button"
-                  @click="cycleProjectStatus"
-                >
-                  {{ editStatusText }}
-                </button>
-              </label>
-            </div>
           </div>
 
           <div class="detail-grid edit-detail-grid">
             <label>
               目前人數
-              <input v-model.number="editForm.current_members" type="number" min="1">
+              <input :value="group.current_members" disabled>
             </label>
             <label>
               人數上限
@@ -394,7 +380,6 @@ const editForm = reactive({
   teacher_name: '',
   current_members: 1,
   max_members: 4,
-  status: 'open',
   required_skills: '',
   contact: '',
   accepting_applications: true,
@@ -441,21 +426,19 @@ function closeTransferModal() {
   resetTransferForm()
 }
 
-const projectStatusLabels = {
-  open: '開放中',
-  full: '已額滿',
-  closed: '已關閉'
-}
+const groupStatusText = computed(() => {
+  if (isGroupFull.value) {
+    return '已額滿'
+  }
+  return group.value?.accepting_applications ? '開放中' : '暫停申請'
+})
 
-const projectStatusOrder = ['open', 'full', 'closed']
-
-const groupStatusText = computed(() => projectStatusLabels[group.value?.status] || '未知狀態')
-
-const groupStatusClass = computed(() => group.value?.status || 'paused')
-
-const editStatusText = computed(() => projectStatusLabels[editForm.status] || '未知狀態')
-
-const editStatusClass = computed(() => editForm.status || 'paused')
+const groupStatusClass = computed(() => {
+  if (isGroupFull.value) {
+    return 'full'
+  }
+  return group.value?.accepting_applications ? 'open' : 'paused'
+})
 
 const canUseDiscussion = computed(() => (
   group.value?.relation === 'owned' || group.value?.relation === 'joined'
@@ -474,7 +457,6 @@ const canManageGroupDetails = computed(() => (
 ))
 
 const isGroupFull = computed(() => (
-  group.value?.status === 'full' ||
   Number(group.value?.current_members || 0) >= Number(group.value?.max_members || 0)
 ))
 
@@ -535,7 +517,6 @@ function fillEditForm(source) {
     teacher_name: source.teacher_name || '',
     current_members: Number(source.current_members || 1),
     max_members: Number(source.max_members || 4),
-    status: source.status || 'open',
     required_skills: source.required_skills || '',
     contact: source.contact || '',
     accepting_applications: Boolean(source.accepting_applications),
@@ -655,15 +636,18 @@ function cancelEditForm() {
   showEditForm.value = false
 }
 
-function cycleProjectStatus() {
-  const currentIndex = projectStatusOrder.indexOf(editForm.status)
-  const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % projectStatusOrder.length : 0
-  editForm.status = projectStatusOrder[nextIndex]
-}
-
 async function saveProject() {
   try {
-    await api.put(`/projects/${group.value.id}`, editForm)
+    await api.put(`/projects/${group.value.id}`, {
+      title: editForm.title,
+      course_name: editForm.course_name,
+      teacher_name: editForm.teacher_name,
+      max_members: editForm.max_members,
+      required_skills: editForm.required_skills,
+      contact: editForm.contact,
+      accepting_applications: editForm.accepting_applications,
+      description: editForm.description
+    })
     showEditForm.value = false
     showToast('專題資料已更新')
     await loadGroup()

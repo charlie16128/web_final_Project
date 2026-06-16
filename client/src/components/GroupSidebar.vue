@@ -22,7 +22,7 @@
         <div v-if="!visibleGroups.length" key="empty" class="mini-item">目前沒有群組</div>
         <RouterLink
           v-for="group in visibleGroups"
-          :key="`${group.relation}-${group.id}`"
+          :key="group.id"
           class="group-item"
           :to="{ name: 'group', params: { id: group.id } }"
         >
@@ -30,7 +30,7 @@
             <strong>{{ group.title }}</strong>
             <span>{{ group.relation === 'owned' ? '我建立' : '已加入' }}</span>
           </div>
-          <small>{{ statusText(group.status) }} | {{ group.current_members }} / {{ group.max_members }}</small>
+          <small>{{ groupStatusText(group) }} | {{ group.current_members }} / {{ group.max_members }}</small>
         </RouterLink>
       </TransitionGroup>
     </section>
@@ -59,6 +59,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { statusText } from '../utils/status'
+import { isProjectFull } from '../utils/projectPresentation'
 
 const props = defineProps({
   modelValue: {
@@ -79,20 +80,43 @@ const emit = defineEmits(['update:modelValue'])
 const switching = ref(false)
 let switchingTimer = 0
 
+const ownedGroups = computed(() => (
+  (props.groups.owned || []).map((group) => ({
+    ...group,
+    relation: 'owned'
+  }))
+))
+
+const joinedGroups = computed(() => {
+  const ownedIds = new Set(ownedGroups.value.map((group) => group.id))
+
+  return (props.groups.joined || [])
+    .filter((group) => !ownedIds.has(group.id))
+    .map((group) => ({
+      ...group,
+      relation: 'joined'
+    }))
+})
+
+const allGroups = computed(() => [
+  ...ownedGroups.value,
+  ...joinedGroups.value
+])
+  
 const counts = computed(() => ({
-  owned: props.groups.owned.length,
-  joined: props.groups.joined.length,
-  all: props.groups.owned.length + props.groups.joined.length
+  owned: ownedGroups.value.length,
+  joined: joinedGroups.value.length,
+  all: allGroups.value.length
 }))
 
 const visibleGroups = computed(() => {
   if (props.modelValue === 'owned') {
-    return props.groups.owned
+    return ownedGroups.value
   }
   if (props.modelValue === 'joined') {
-    return props.groups.joined
+    return joinedGroups.value
   }
-  return props.groups.owned.concat(props.groups.joined)
+  return allGroups.value
 })
 
 const pendingApplications = computed(() => props.applications.filter((item) => item.status === 'pending'))
@@ -113,5 +137,12 @@ function changeTab(tab) {
   switchingTimer = window.setTimeout(() => {
     switching.value = false
   }, 220)
+}
+
+function groupStatusText(group) {
+  if (isProjectFull(group)) {
+    return '已額滿'
+  }
+  return group.accepting_applications ? '開放中' : '暫停申請'
 }
 </script>

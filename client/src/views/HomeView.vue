@@ -14,7 +14,7 @@
     <div class="main-column">
       <ProjectForm @create="createProject" />
 
-      <section v-if="myInvitations.length" class="panel invite-list">
+      <section class="panel invite-list">
         <div class="section-title">
           <h2>我的邀請</h2>
           <p>回覆隊長邀請你加入的專題。</p>

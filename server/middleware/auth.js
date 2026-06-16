@@ -7,7 +7,7 @@ if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
 var JWT_SECRET = process.env.JWT_SECRET || 'teamup-campus-dev-secret';
 
 function signToken(user) {
-  return jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+  return jwt.sign({ id: user.student_id, student_id: user.student_id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
 }
 
 function getToken(req) {

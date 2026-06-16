@@ -9,7 +9,7 @@ export function skillTags(skills) {
 }
 
 export function isProjectFull(project) {
-  return project?.status === 'full' || Number(project?.current_members || 0) >= Number(project?.max_members || 0)
+  return Number(project?.current_members || 0) >= Number(project?.max_members || 0)
 }
 
 export function canApplyToProject(project, user) {
@@ -17,7 +17,6 @@ export function canApplyToProject(project, user) {
     user &&
     project?.owner_id !== user.id &&
     project?.accepting_applications &&
-    project?.status === 'open' &&
     !isProjectFull(project)
   )
 }
