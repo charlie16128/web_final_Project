@@ -9,13 +9,15 @@ export function skillTags(skills) {
 }
 
 export function isProjectFull(project) {
-  return Number(project?.current_members || 0) >= Number(project?.max_members || 0)
+  return project?.status === 'full' || Number(project?.current_members || 0) >= Number(project?.max_members || 0)
 }
 
 export function canApplyToProject(project, user) {
+  const currentUserId = user?.student_id || user?.id
+
   return Boolean(
     user &&
-    project?.owner_id !== user.id &&
+    project?.owner_id !== currentUserId &&
     project?.accepting_applications &&
     !isProjectFull(project)
   )

@@ -178,7 +178,7 @@ test('user settings reject stale token instead of server error', async function(
   try {
     var auth = require('../middleware/auth');
     var staleToken = auth.signToken({
-      id: 9999,
+      student_id: 'D9999999',
       email: 'missing-user@example.com'
     });
 

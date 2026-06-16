@@ -306,7 +306,7 @@
       <form class="stack team-management-form invite-member-form" @submit.prevent="inviteMember">
         <label>
           邀請使用者 ID
-          <input v-model.number="inviteForm.user_id" type="number" min="1" :disabled="isGroupFull" required>
+          <input v-model.trim="inviteForm.user_id" :disabled="isGroupFull" required>
         </label>
         <label>
           邀請訊息
@@ -330,7 +330,7 @@
       <form class="stack team-management-form transfer-owner-form" @submit.prevent="transferOwner">
         <label>
           新隊長
-          <select v-model.number="transferForm.user_id" required>
+          <select v-model="transferForm.user_id" required>
             <option value="" disabled>選擇現有成員</option>
             <option v-for="member in transferableMembers" :key="member.id" :value="member.id">
               {{ member.name }}

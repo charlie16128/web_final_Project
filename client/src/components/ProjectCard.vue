@@ -103,7 +103,10 @@ const props = defineProps({
 
 defineEmits(['apply', 'comment', 'favorite', 'update-application'])
 
-const isOwner = computed(() => props.user && props.user.id === props.project.owner_id)
+const isOwner = computed(() => {
+  const currentUserId = props.user?.student_id || props.user?.id
+  return Boolean(currentUserId && currentUserId === props.project.owner_id)
+})
 const tags = computed(() => skillTags(props.project.required_skills))
 const isFull = computed(() => isProjectFull(props.project))
 const canApply = computed(() => canApplyToProject(props.project, props.user))

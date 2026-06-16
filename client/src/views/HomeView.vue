@@ -140,7 +140,8 @@ async function loadProjects() {
   projects.value = response.data.projects.map(normalizeProject)
   await Promise.all(projects.value.map(async (project) => {
     await loadComments(project)
-    if (user.value && user.value.id === project.owner_id) {
+    const currentUserId = user.value?.student_id || user.value?.id
+    if (currentUserId === project.owner_id) {
       await loadProjectApplications(project)
     }
   }))
