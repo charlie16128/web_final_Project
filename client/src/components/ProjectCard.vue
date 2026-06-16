@@ -2,7 +2,11 @@
   <article class="project-card">
     <div class="project-head">
       <div>
-        <h3>{{ project.title }}</h3>
+        <h3>
+          <RouterLink class="project-title-link" :to="{ name: 'group', params: { id: project.id } }">
+            {{ project.title }}
+          </RouterLink>
+        </h3>
         <div class="meta">
           {{ project.course_name || '未填課程' }} |
           {{ project.teacher_name || '未填老師' }} |
@@ -36,6 +40,14 @@
         @click="$emit('favorite', project)"
       >
         {{ favoriteText(project) }}
+      </button>
+      <button
+        v-if="user && !isOwner"
+        class="ghost danger compact-action"
+        type="button"
+        @click="$emit('report', project)"
+      >
+        檢舉
       </button>
     </div>
 
@@ -90,7 +102,7 @@ const props = defineProps({
   }
 })
 
-defineEmits(['apply', 'comment', 'favorite', 'update-application'])
+defineEmits(['apply', 'comment', 'favorite', 'report', 'update-application'])
 
 const isOwner = computed(() => {
   const currentUserId = props.user?.student_id || props.user?.id

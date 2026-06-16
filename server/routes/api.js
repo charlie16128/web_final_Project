@@ -53,6 +53,8 @@ function publicUser(row) {
     bio: row.bio || '',
     github_url: row.github_url || '',
     is_suspended: row.is_suspended || 0,
+    suspended_until: row.suspended_until || null,
+    suspended_reason: row.suspended_reason || '',
     created_at: row.created_at
   };
 }
@@ -76,6 +78,54 @@ function projectStatusFromCapacity(currentMembers, maxMembers) {
 
 function isAdminRole(user) {
   return user && (user.role === 'admin' || user.role === 'super_admin');
+}
+
+function requireAdmin(req, res, next) {
+  currentUser(req.user.student_id)
+    .then(function(user) {
+      if (!isAdminRole(user)) {
+        res.status(403).json({ message: '需要管理員權限' });
+        return;
+      }
+      req.adminUser = user;
+      next();
+    })
+    .catch(next);
+}
+
+function isActiveSuspension(user) {
+  if (!user || !user.is_suspended) {
+    return false;
+  }
+  if (!user.suspended_until) {
+    return true;
+  }
+  return new Date(user.suspended_until).getTime() > Date.now();
+}
+
+function suspensionMessage(user) {
+  if (!user.suspended_until) {
+    return '帳號已被永久停權' + (user.suspended_reason ? '：' + user.suspended_reason : '');
+  }
+  return '帳號停權至 ' + user.suspended_until + (user.suspended_reason ? '：' + user.suspended_reason : '');
+}
+
+function bannedUntilFromDays(days) {
+  if (days === null || days === undefined || days === '') {
+    return null;
+  }
+  var banDays = Number(days);
+  var until = new Date();
+  until.setDate(until.getDate() + banDays);
+  return until.toISOString();
+}
+
+function validateBanDays(days) {
+  if (days === null || days === undefined || days === '') {
+    return true;
+  }
+  var value = Number(days);
+  return Number.isInteger(value) && value >= 1 && value <= 365;
 }
 
 function isProjectAtCapacity(project) {
@@ -195,6 +245,21 @@ router.post('/login', asyncHandler(async function(req, res) {
     return;
   }
 
+  if (user.is_suspended && user.suspended_until && new Date(user.suspended_until).getTime() <= Date.now()) {
+    await db.run(
+      'UPDATE users SET is_suspended = 0, suspended_until = NULL, suspended_reason = NULL WHERE student_id = ?',
+      [user.student_id]
+    );
+    user.is_suspended = 0;
+    user.suspended_until = null;
+    user.suspended_reason = null;
+  }
+
+  if (isActiveSuspension(user)) {
+    res.status(403).json({ message: suspensionMessage(user) });
+    return;
+  }
+
   res.json({ token: auth.signToken(user), user: publicUser(user) });
 }));
 
@@ -277,6 +342,317 @@ router.put('/users/me', auth.authRequired, asyncHandler(async function(req, res)
   res.json({ user: publicUser(user) });
 }));
 
+router.post('/reports', auth.authRequired, asyncHandler(async function(req, res) {
+  var body = req.body;
+  if (!required(body.reason)) {
+    res.status(400).json({ message: '請輸入檢舉原因' });
+    return;
+  }
+  if (!required(body.target_user_id) && !required(body.target_project_id) && !required(body.target_comment_id)) {
+    res.status(400).json({ message: '請選擇檢舉對象' });
+    return;
+  }
+
+  var targetUserId = required(body.target_user_id) ? String(body.target_user_id).trim() : null;
+  var targetProjectId = required(body.target_project_id) ? Number(body.target_project_id) : null;
+  var targetCommentId = required(body.target_comment_id) ? Number(body.target_comment_id) : null;
+
+  if (targetUserId) {
+    var targetUser = await db.get('SELECT student_id FROM users WHERE student_id = ?', [targetUserId]);
+    if (!targetUser) {
+      res.status(404).json({ message: '找不到被檢舉的使用者' });
+      return;
+    }
+  }
+
+  if (targetProjectId) {
+    var targetProject = await db.get('SELECT id FROM projects WHERE id = ?', [targetProjectId]);
+    if (!targetProject) {
+      res.status(404).json({ message: '找不到被檢舉的專題' });
+      return;
+    }
+  }
+
+  if (targetCommentId) {
+    var targetComment = await db.get('SELECT id, user_id, project_id FROM comments WHERE id = ?', [targetCommentId]);
+    if (!targetComment) {
+      res.status(404).json({ message: '找不到被檢舉的留言' });
+      return;
+    }
+    targetUserId = targetUserId || targetComment.user_id;
+    targetProjectId = targetProjectId || targetComment.project_id;
+  }
+
+  var result = await db.run(
+    'INSERT INTO reports (reporter_id, target_user_id, target_project_id, target_comment_id, reason, detail) ' +
+      'VALUES (?, ?, ?, ?, ?, ?)',
+    [
+      req.user.student_id,
+      targetUserId,
+      targetProjectId,
+      targetCommentId,
+      String(body.reason).trim(),
+      body.detail || ''
+    ]
+  );
+
+  res.status(201).json({ report: await reportById(result.id) });
+}));
+
+router.get('/me/warnings', auth.authRequired, asyncHandler(async function(req, res) {
+  var warnings = await db.all(
+    'SELECT id, message, created_at FROM user_warnings WHERE user_id = ? ORDER BY created_at DESC',
+    [req.user.student_id]
+  );
+  res.json({ warnings: warnings });
+}));
+
+router.delete('/me/warnings/:id', auth.authRequired, asyncHandler(async function(req, res) {
+  var deleted = await db.run(
+    'DELETE FROM user_warnings WHERE id = ? AND user_id = ?',
+    [req.params.id, req.user.student_id]
+  );
+  if (!deleted.changes) {
+    res.status(404).json({ message: '找不到警告訊息' });
+    return;
+  }
+  res.json({ message: '警告已讀' });
+}));
+
+router.use('/admin', auth.authRequired, requireAdmin);
+
+router.get('/admin/reports', asyncHandler(async function(req, res) {
+  var status = req.query.status || 'pending';
+  var allowed = ['pending', 'ignored', 'handled', 'all'];
+  if (allowed.indexOf(status) < 0) {
+    res.status(400).json({ message: '檢舉狀態不正確' });
+    return;
+  }
+
+  var where = status === 'all' ? '' : 'WHERE reports.status = ? ';
+  var params = status === 'all' ? [] : [status];
+  var reports = await db.all(reportSelectSql(where + 'ORDER BY reports.created_at DESC'), params);
+  res.json({ reports: reports });
+}));
+
+router.patch('/admin/reports/:id/ignore', asyncHandler(async function(req, res) {
+  var updated = await db.run(
+    'UPDATE reports SET status = "ignored", handled_action = "ignore", handled_by = ?, handled_note = ?, handled_at = CURRENT_TIMESTAMP WHERE id = ? AND status = "pending"',
+    [req.adminUser.student_id, req.body.note || '', req.params.id]
+  );
+  if (!updated.changes) {
+    res.status(404).json({ message: '找不到待處理檢舉' });
+    return;
+  }
+  res.json({ report: await reportById(req.params.id) });
+}));
+
+router.patch('/admin/reports/:id/warn', asyncHandler(async function(req, res) {
+  var report = await reportById(req.params.id);
+  if (!report || report.status !== 'pending') {
+    res.status(404).json({ message: '找不到待處理檢舉' });
+    return;
+  }
+
+  var targetUserId = req.body.target_user_id || report.target_user_id;
+  if (!required(targetUserId) || !required(req.body.message)) {
+    res.status(400).json({ message: '請輸入警告對象與內容' });
+    return;
+  }
+
+  var targetUser = await currentUser(String(targetUserId).trim());
+  if (!targetUser) {
+    res.status(404).json({ message: '找不到使用者' });
+    return;
+  }
+  if (targetUser.role === 'super_admin') {
+    res.status(400).json({ message: '不能警告 super_admin' });
+    return;
+  }
+
+  await db.run(
+    'INSERT INTO user_warnings (user_id, message, created_by) VALUES (?, ?, ?)',
+    [targetUser.student_id, String(req.body.message).trim(), req.adminUser.student_id]
+  );
+  await db.run(
+    'INSERT INTO punishments (user_id, admin_id, type, message) VALUES (?, ?, "warning", ?)',
+    [targetUser.student_id, req.adminUser.student_id, String(req.body.message).trim()]
+  );
+  await db.run(
+    'UPDATE reports SET status = "handled", handled_action = "warning", handled_by = ?, handled_note = ?, handled_at = CURRENT_TIMESTAMP WHERE id = ?',
+    [req.adminUser.student_id, String(req.body.message).trim(), req.params.id]
+  );
+
+  res.json({ report: await reportById(req.params.id) });
+}));
+
+router.patch('/admin/reports/:id/ban', asyncHandler(async function(req, res) {
+  var report = await reportById(req.params.id);
+  if (!report || report.status !== 'pending') {
+    res.status(404).json({ message: '找不到待處理檢舉' });
+    return;
+  }
+
+  var targetUserId = req.body.target_user_id || report.target_user_id;
+  if (!required(targetUserId) || !required(req.body.reason)) {
+    res.status(400).json({ message: '請輸入停權對象與原因' });
+    return;
+  }
+  if (!validateBanDays(req.body.ban_days)) {
+    res.status(400).json({ message: '停權天數必須介於 1 到 365 天，或留空代表永久停權' });
+    return;
+  }
+
+  var targetUser = await currentUser(String(targetUserId).trim());
+  if (!targetUser) {
+    res.status(404).json({ message: '找不到使用者' });
+    return;
+  }
+  if (targetUser.role === 'super_admin') {
+    res.status(400).json({ message: '不能停權 super_admin' });
+    return;
+  }
+
+  var bannedUntil = bannedUntilFromDays(req.body.ban_days);
+  var action = bannedUntil ? 'temporary_ban' : 'permanent_ban';
+  var banDays = bannedUntil ? Number(req.body.ban_days) : null;
+  var reason = String(req.body.reason).trim();
+
+  await db.run(
+    'UPDATE users SET is_suspended = 1, suspended_until = ?, suspended_reason = ? WHERE student_id = ?',
+    [bannedUntil, reason, targetUser.student_id]
+  );
+  await db.run(
+    'INSERT INTO punishments (user_id, admin_id, type, message, ban_days, banned_until) VALUES (?, ?, ?, ?, ?, ?)',
+    [targetUser.student_id, req.adminUser.student_id, action, reason, banDays, bannedUntil]
+  );
+  await db.run(
+    'UPDATE reports SET status = "handled", handled_action = ?, handled_by = ?, handled_note = ?, handled_at = CURRENT_TIMESTAMP WHERE id = ?',
+    [action, req.adminUser.student_id, reason, req.params.id]
+  );
+
+  res.json({ report: await reportById(req.params.id) });
+}));
+
+router.get('/admin/users', asyncHandler(async function(req, res) {
+  var q = String(req.query.q || '').trim();
+  var where = '';
+  var params = [];
+
+  if (q) {
+    where = 'WHERE student_id LIKE ? OR email LIKE ? OR name LIKE ? ';
+    params = ['%' + q + '%', '%' + q + '%', '%' + q + '%'];
+  }
+
+  var users = await db.all(
+    'SELECT student_id, username, name, email, role, is_suspended, suspended_until, suspended_reason, created_at ' +
+      'FROM users ' + where + 'ORDER BY role DESC, created_at DESC',
+    params
+  );
+  res.json({ users: users });
+}));
+
+router.patch('/admin/users/:student_id/role', asyncHandler(async function(req, res) {
+  var role = req.body.role;
+  if (role !== 'user' && role !== 'admin') {
+    res.status(400).json({ message: '角色只能是 user 或 admin' });
+    return;
+  }
+
+  var targetUser = await currentUser(req.params.student_id);
+  if (!targetUser) {
+    res.status(404).json({ message: '找不到使用者' });
+    return;
+  }
+  if (targetUser.role === 'super_admin') {
+    res.status(400).json({ message: '不能修改 super_admin 角色' });
+    return;
+  }
+
+  await db.run('UPDATE users SET role = ? WHERE student_id = ?', [role, req.params.student_id]);
+  res.json({ user: publicUser(await currentUser(req.params.student_id)) });
+}));
+
+router.post('/admin/users/:student_id/warn', asyncHandler(async function(req, res) {
+  var targetUser = await currentUser(req.params.student_id);
+  if (!targetUser) {
+    res.status(404).json({ message: '找不到使用者' });
+    return;
+  }
+  if (targetUser.role === 'super_admin') {
+    res.status(400).json({ message: '不能警告 super_admin' });
+    return;
+  }
+  if (!required(req.body.message)) {
+    res.status(400).json({ message: '請輸入警告內容' });
+    return;
+  }
+
+  var message = String(req.body.message).trim();
+  var result = await db.run(
+    'INSERT INTO user_warnings (user_id, message, created_by) VALUES (?, ?, ?)',
+    [targetUser.student_id, message, req.adminUser.student_id]
+  );
+  await db.run(
+    'INSERT INTO punishments (user_id, admin_id, type, message) VALUES (?, ?, "warning", ?)',
+    [targetUser.student_id, req.adminUser.student_id, message]
+  );
+  res.status(201).json({ warning: await db.get('SELECT * FROM user_warnings WHERE id = ?', [result.id]) });
+}));
+
+router.post('/admin/users/:student_id/ban', asyncHandler(async function(req, res) {
+  var targetUser = await currentUser(req.params.student_id);
+  if (!targetUser) {
+    res.status(404).json({ message: '找不到使用者' });
+    return;
+  }
+  if (targetUser.role === 'super_admin') {
+    res.status(400).json({ message: '不能停權 super_admin' });
+    return;
+  }
+  if (!required(req.body.reason) || !validateBanDays(req.body.ban_days)) {
+    res.status(400).json({ message: '請輸入停權原因，天數需介於 1 到 365 天或留空代表永久停權' });
+    return;
+  }
+
+  var bannedUntil = bannedUntilFromDays(req.body.ban_days);
+  var action = bannedUntil ? 'temporary_ban' : 'permanent_ban';
+  var banDays = bannedUntil ? Number(req.body.ban_days) : null;
+  var reason = String(req.body.reason).trim();
+
+  await db.run(
+    'UPDATE users SET is_suspended = 1, suspended_until = ?, suspended_reason = ? WHERE student_id = ?',
+    [bannedUntil, reason, targetUser.student_id]
+  );
+  await db.run(
+    'INSERT INTO punishments (user_id, admin_id, type, message, ban_days, banned_until) VALUES (?, ?, ?, ?, ?, ?)',
+    [targetUser.student_id, req.adminUser.student_id, action, reason, banDays, bannedUntil]
+  );
+  res.json({ user: publicUser(await currentUser(targetUser.student_id)) });
+}));
+
+router.post('/admin/users/:student_id/unban', asyncHandler(async function(req, res) {
+  var targetUser = await currentUser(req.params.student_id);
+  if (!targetUser) {
+    res.status(404).json({ message: '找不到使用者' });
+    return;
+  }
+  if (targetUser.role === 'super_admin') {
+    res.status(400).json({ message: '不能操作 super_admin' });
+    return;
+  }
+
+  await db.run(
+    'UPDATE users SET is_suspended = 0, suspended_until = NULL, suspended_reason = NULL WHERE student_id = ?',
+    [targetUser.student_id]
+  );
+  await db.run(
+    'INSERT INTO punishments (user_id, admin_id, type, message) VALUES (?, ?, "unban", ?)',
+    [targetUser.student_id, req.adminUser.student_id, req.body.note || '解除停權']
+  );
+  res.json({ user: publicUser(await currentUser(targetUser.student_id)) });
+}));
+
 router.get('/projects', auth.optionalAuth, asyncHandler(async function(req, res) {
   var userId = req.user ? req.user.student_id : null;
   var favoriteFilter = req.query.filter === 'favorited';
@@ -356,8 +732,9 @@ router.post('/projects/:id/invitations', auth.authRequired, asyncHandler(async f
     res.status(404).json({ message: '找不到專題' });
     return;
   }
-  if (project.owner_id !== req.user.student_id) {
-    res.status(403).json({ message: '只有隊長可以邀請成員' });
+  var manageableProject = await manageableProjectForUser(req.params.id, req.user.student_id);
+  if (!manageableProject || !manageableProject.can_manage) {
+    res.status(403).json({ message: '只有隊長或管理員可以邀請成員' });
     return;
   }
   if (!required(req.body.user_id)) {
@@ -515,13 +892,13 @@ router.post('/invitations/:id/reject', auth.authRequired, asyncHandler(async fun
 }));
 
 router.post('/projects/:id/transfer-owner', auth.authRequired, asyncHandler(async function(req, res) {
-  var project = await db.get('SELECT * FROM projects WHERE id = ?', [req.params.id]);
+  var project = await manageableProjectForUser(req.params.id, req.user.student_id);
   if (!project) {
     res.status(404).json({ message: '找不到專題' });
     return;
   }
-  if (project.owner_id !== req.user.student_id) {
-    res.status(403).json({ message: '只有隊長可以轉移隊長身份' });
+  if (!project.can_manage) {
+    res.status(403).json({ message: '只有隊長或管理員可以轉移隊長身份' });
     return;
   }
   if (!required(req.body.user_id)) {
@@ -530,7 +907,7 @@ router.post('/projects/:id/transfer-owner', auth.authRequired, asyncHandler(asyn
   }
 
   var nextOwnerId = String(req.body.user_id).trim();
-  if (nextOwnerId === req.user.student_id) {
+  if (nextOwnerId === project.owner_id) {
     res.status(400).json({ message: '新隊長不能是目前隊長' });
     return;
   }
@@ -548,14 +925,14 @@ router.post('/projects/:id/transfer-owner', auth.authRequired, asyncHandler(asyn
 
   var oldOwnerMembership = await db.get(
     'SELECT id FROM applications WHERE project_id = ? AND user_id = ?',
-    [req.params.id, req.user.student_id]
+    [req.params.id, project.owner_id]
   );
   if (oldOwnerMembership) {
     await db.run('UPDATE applications SET status = "accepted" WHERE id = ?', [oldOwnerMembership.id]);
   } else {
     await db.run(
       'INSERT INTO applications (project_id, user_id, message, status) VALUES (?, ?, ?, "accepted")',
-      [req.params.id, req.user.student_id, 'Former project owner']
+      [req.params.id, project.owner_id, 'Former project owner']
     );
   }
 
@@ -599,11 +976,14 @@ router.get('/groups/me', auth.authRequired, asyncHandler(async function(req, res
 }));
 
 router.get('/groups/:id', auth.authRequired, asyncHandler(async function(req, res) {
-  var project = await groupForUser(req.params.id, req.user.student_id);
+  var user = await currentUser(req.user.student_id);
+  var project = await groupOrAdminForUser(req.params.id, req.user.student_id);
   if (!project) {
     res.status(404).json({ message: '找不到可存取的群組' });
     return;
   }
+  project.can_manage = project.owner_id === req.user.student_id || isAdminRole(user);
+  project.can_view_private_area = ['owned', 'joined', 'admin'].indexOf(project.relation) >= 0;
   res.json({ group: project });
 }));
 
@@ -629,13 +1009,13 @@ router.get('/groups/:id/members', auth.authRequired, asyncHandler(async function
 }));
 
 router.delete('/groups/:id/members/:memberId', auth.authRequired, asyncHandler(async function(req, res) {
-  var project = await db.get('SELECT * FROM projects WHERE id = ?', [req.params.id]);
+  var project = await manageableProjectForUser(req.params.id, req.user.student_id);
   if (!project) {
     res.status(404).json({ message: '找不到專題' });
     return;
   }
-  if (project.owner_id !== req.user.student_id) {
-    res.status(403).json({ message: '只有隊長可以移除隊員' });
+  if (!project.can_manage) {
+    res.status(403).json({ message: '只有隊長或管理員可以移除隊員' });
     return;
   }
 
@@ -936,13 +1316,13 @@ router.post('/projects', auth.authRequired, asyncHandler(async function(req, res
 }));
 
 router.put('/projects/:id', auth.authRequired, asyncHandler(async function(req, res) {
-  var project = await db.get('SELECT * FROM projects WHERE id = ?', [req.params.id]);
+  var project = await manageableProjectForUser(req.params.id, req.user.student_id);
   if (!project) {
     res.status(404).json({ message: '找不到專題' });
     return;
   }
-  if (project.owner_id !== req.user.student_id) {
-    res.status(403).json({ message: '只有建立者可以編輯專題' });
+  if (!project.can_manage) {
+    res.status(403).json({ message: '只有建立者或管理員可以編輯專題' });
     return;
   }
 
@@ -971,13 +1351,13 @@ router.put('/projects/:id', auth.authRequired, asyncHandler(async function(req, 
 }));
 
 router.delete('/projects/:id', auth.authRequired, asyncHandler(async function(req, res) {
-  var project = await db.get('SELECT * FROM projects WHERE id = ?', [req.params.id]);
+  var project = await manageableProjectForUser(req.params.id, req.user.student_id);
   if (!project) {
     res.status(404).json({ message: '找不到專題' });
     return;
   }
-  if (project.owner_id !== req.user.student_id) {
-    res.status(403).json({ message: '只有建立者可以刪除專題' });
+  if (!project.can_manage) {
+    res.status(403).json({ message: '只有建立者或管理員可以刪除專題' });
     return;
   }
   await db.run('DELETE FROM projects WHERE id = ?', [req.params.id]);
@@ -1018,13 +1398,13 @@ router.post('/projects/:id/apply', auth.authRequired, asyncHandler(async functio
 }));
 
 router.get('/projects/:id/applications', auth.authRequired, asyncHandler(async function(req, res) {
-  var project = await db.get('SELECT * FROM projects WHERE id = ?', [req.params.id]);
+  var project = await manageableProjectForUser(req.params.id, req.user.student_id);
   if (!project) {
     res.status(404).json({ message: '找不到專題' });
     return;
   }
-  if (project.owner_id !== req.user.student_id) {
-    res.status(403).json({ message: '只有建立者可以查看申請' });
+  if (!project.can_manage) {
+    res.status(403).json({ message: '只有建立者或管理員可以查看申請' });
     return;
   }
   var applications = await db.all(
@@ -1089,8 +1469,9 @@ router.put('/applications/:id', auth.authRequired, asyncHandler(async function(r
     res.status(404).json({ message: '找不到申請' });
     return;
   }
-  if (application.owner_id !== req.user.student_id) {
-    res.status(403).json({ message: '只有專題建立者可以審核申請' });
+  var project = await manageableProjectForUser(application.project_id, req.user.student_id);
+  if (!project || !project.can_manage) {
+    res.status(403).json({ message: '只有專題建立者或管理員可以審核申請' });
     return;
   }
   if (VALID_APPLICATION_STATUS.indexOf(req.body.status) < 0) {
@@ -1154,8 +1535,9 @@ router.delete('/comments/:id', auth.authRequired, asyncHandler(async function(re
     res.status(404).json({ message: '找不到留言' });
     return;
   }
-  if (comment.user_id !== req.user.student_id) {
-    res.status(403).json({ message: '只能刪除自己的留言' });
+  var user = await currentUser(req.user.student_id);
+  if (comment.user_id !== req.user.student_id && !isAdminRole(user)) {
+    res.status(403).json({ message: '只能刪除自己的留言或由管理員刪除' });
     return;
   }
   await db.run('DELETE FROM comments WHERE id = ?', [req.params.id]);
@@ -1204,6 +1586,27 @@ function deadlineById(id) {
   return db.get('SELECT * FROM project_deadlines WHERE id = ?', [id]);
 }
 
+function reportSelectSql(suffix) {
+  return (
+    'SELECT reports.*, ' +
+      'reporter.name AS reporter_name, reporter.email AS reporter_email, reporter.role AS reporter_role, ' +
+      'target.name AS target_user_name, target.email AS target_user_email, target.role AS target_user_role, ' +
+      'projects.title AS project_title, comments.content AS comment_content, ' +
+      'handler.name AS handled_by_name ' +
+    'FROM reports ' +
+    'JOIN users AS reporter ON reporter.student_id = reports.reporter_id ' +
+    'LEFT JOIN users AS target ON target.student_id = reports.target_user_id ' +
+    'LEFT JOIN projects ON projects.id = reports.target_project_id ' +
+    'LEFT JOIN comments ON comments.id = reports.target_comment_id ' +
+    'LEFT JOIN users AS handler ON handler.student_id = reports.handled_by ' +
+    (suffix || '')
+  );
+}
+
+function reportById(id) {
+  return db.get(reportSelectSql('WHERE reports.id = ?'), [id]);
+}
+
 function groupForUser(projectId, userId) {
   return db.get(
     'SELECT projects.*, users.name AS owner_name, users.role AS owner_role, ' +
@@ -1221,7 +1624,16 @@ function groupForUser(projectId, userId) {
   );
 }
 
-function groupMemberForUser(projectId, userId) {
+async function groupMemberForUser(projectId, userId) {
+  var user = await currentUser(userId);
+  if (isAdminRole(user)) {
+    return db.get(
+      'SELECT projects.*, users.name AS owner_name, users.role AS owner_role, "admin" AS relation ' +
+        'FROM projects JOIN users ON users.student_id = projects.owner_id WHERE projects.id = ?',
+      [projectId]
+    );
+  }
+
   return db.get(
     'SELECT projects.*, users.name AS owner_name, users.role AS owner_role, ' +
       'CASE WHEN projects.owner_id = ? THEN "owned" ELSE "joined" END AS relation ' +

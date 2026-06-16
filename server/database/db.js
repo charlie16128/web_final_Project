@@ -215,6 +215,8 @@ async function createCurrentSchema() {
       'bio TEXT,' +
       'github_url TEXT,' +
       'is_suspended INTEGER DEFAULT 0,' +
+      'suspended_until TEXT,' +
+      'suspended_reason TEXT,' +
       'created_at TEXT DEFAULT CURRENT_TIMESTAMP' +
     ')'
   );
@@ -225,6 +227,8 @@ async function createCurrentSchema() {
   await addColumn('users', 'grade TEXT');
   await addColumn('users', 'github_url TEXT');
   await addColumn('users', 'is_suspended INTEGER DEFAULT 0');
+  await addColumn('users', 'suspended_until TEXT');
+  await addColumn('users', 'suspended_reason TEXT');
   await rawRun('UPDATE users SET username = name WHERE username IS NULL OR username = ""');
   await rawRun('UPDATE users SET role = "user" WHERE role IS NULL OR role = ""');
   await rawRun('UPDATE users SET is_suspended = 0 WHERE is_suspended IS NULL');
@@ -349,6 +353,53 @@ async function createCurrentSchema() {
       'FOREIGN KEY(user_id) REFERENCES users(student_id) ON DELETE CASCADE' +
     ')'
   );
+  await rawRun(
+    'CREATE TABLE IF NOT EXISTS reports (' +
+      'id INTEGER PRIMARY KEY AUTOINCREMENT,' +
+      'reporter_id TEXT NOT NULL,' +
+      'target_user_id TEXT,' +
+      'target_project_id INTEGER,' +
+      'target_comment_id INTEGER,' +
+      'reason TEXT NOT NULL,' +
+      'detail TEXT,' +
+      'status TEXT DEFAULT "pending",' +
+      'handled_by TEXT,' +
+      'handled_action TEXT,' +
+      'handled_note TEXT,' +
+      'created_at TEXT DEFAULT CURRENT_TIMESTAMP,' +
+      'handled_at TEXT,' +
+      'FOREIGN KEY(reporter_id) REFERENCES users(student_id) ON DELETE CASCADE,' +
+      'FOREIGN KEY(target_user_id) REFERENCES users(student_id) ON DELETE SET NULL,' +
+      'FOREIGN KEY(target_project_id) REFERENCES projects(id) ON DELETE CASCADE,' +
+      'FOREIGN KEY(target_comment_id) REFERENCES comments(id) ON DELETE SET NULL,' +
+      'FOREIGN KEY(handled_by) REFERENCES users(student_id) ON DELETE SET NULL' +
+    ')'
+  );
+  await rawRun(
+    'CREATE TABLE IF NOT EXISTS user_warnings (' +
+      'id INTEGER PRIMARY KEY AUTOINCREMENT,' +
+      'user_id TEXT NOT NULL,' +
+      'message TEXT NOT NULL,' +
+      'created_by TEXT NOT NULL,' +
+      'created_at TEXT DEFAULT CURRENT_TIMESTAMP,' +
+      'FOREIGN KEY(user_id) REFERENCES users(student_id) ON DELETE CASCADE,' +
+      'FOREIGN KEY(created_by) REFERENCES users(student_id) ON DELETE CASCADE' +
+    ')'
+  );
+  await rawRun(
+    'CREATE TABLE IF NOT EXISTS punishments (' +
+      'id INTEGER PRIMARY KEY AUTOINCREMENT,' +
+      'user_id TEXT NOT NULL,' +
+      'admin_id TEXT NOT NULL,' +
+      'type TEXT NOT NULL,' +
+      'message TEXT,' +
+      'ban_days INTEGER,' +
+      'banned_until TEXT,' +
+      'created_at TEXT DEFAULT CURRENT_TIMESTAMP,' +
+      'FOREIGN KEY(user_id) REFERENCES users(student_id) ON DELETE CASCADE,' +
+      'FOREIGN KEY(admin_id) REFERENCES users(student_id) ON DELETE CASCADE' +
+    ')'
+  );
 }
 
 async function copyLegacyTable(table, targetColumns, selectExpressions) {
@@ -383,6 +434,8 @@ async function copyLegacyData(legacyTables) {
         'bio',
         'github_url',
         'is_suspended',
+        'suspended_until',
+        'suspended_reason',
         'created_at'
       ],
       [
@@ -400,6 +453,8 @@ async function copyLegacyData(legacyTables) {
         columnExpr(columns, 'bio', 'NULL'),
         columnExpr(columns, 'github_url', 'NULL'),
         coalesceColumnExpr(columns, 'is_suspended', '0'),
+        columnExpr(columns, 'suspended_until', 'NULL'),
+        columnExpr(columns, 'suspended_reason', 'NULL'),
         columnExpr(columns, 'created_at', 'CURRENT_TIMESTAMP')
       ]
     );

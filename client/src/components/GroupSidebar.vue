@@ -53,6 +53,14 @@
         </RouterLink>
       </div>
     </section>
+
+    <RouterLink
+      v-if="isAdmin"
+      class="admin-entry-button"
+      :to="{ name: 'admin' }"
+    >
+      管理員專用介面
+    </RouterLink>
   </aside>
 </template>
 
@@ -73,6 +81,10 @@ const props = defineProps({
   applications: {
     type: Array,
     default: () => []
+  },
+  user: {
+    type: Object,
+    default: null
   }
 })
 
@@ -120,6 +132,7 @@ const visibleGroups = computed(() => {
 })
 
 const pendingApplications = computed(() => props.applications.filter((item) => item.status === 'pending'))
+const isAdmin = computed(() => props.user?.role === 'admin' || props.user?.role === 'super_admin')
 
 const tabClass = computed(() => ({
   [`tab-${props.modelValue}`]: true,

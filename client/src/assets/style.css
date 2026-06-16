@@ -402,6 +402,17 @@ label {
   margin: 0 0 6px;
 }
 
+.project-title-link {
+  color: inherit;
+  text-decoration: none;
+  transform: none;
+}
+
+.project-title-link:hover {
+  color: var(--primary);
+  transform: none;
+}
+
 .badge {
   border-radius: 999px;
   display: inline-flex;
@@ -957,6 +968,135 @@ button.danger:hover {
   width: auto;
 }
 
+.admin-entry-button {
+  background: #dc2626;
+  border-radius: 8px;
+  color: #ffffff;
+  display: block;
+  font-weight: 800;
+  padding: 12px 16px;
+  text-align: center;
+  text-decoration: none;
+  transform: none;
+  width: 100%;
+}
+
+.admin-entry-button:hover {
+  background: #b91c1c;
+  transform: none;
+}
+
+.admin-layout {
+  margin: 0 auto;
+  padding: 24px 0 48px;
+  width: min(1200px, calc(100% - 32px));
+}
+
+.admin-panel,
+.admin-list {
+  display: grid;
+  gap: 14px;
+}
+
+.admin-head {
+  align-items: start;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
+}
+
+.admin-tabs {
+  grid-template-columns: repeat(2, 1fr);
+  margin-bottom: 0;
+}
+
+.admin-tabs::before {
+  background: var(--tab-active);
+  border-radius: 15px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+  content: "";
+  inset: 4px auto 4px 4px;
+  position: absolute;
+  transform: translateX(0);
+  transition: transform 220ms ease;
+  width: calc((100% - 12px) / 2);
+}
+
+.admin-tabs.tab-members::before {
+  transform: translateX(calc(100% + 4px));
+}
+
+.admin-search {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.input-modal {
+  max-width: 520px;
+}
+
+.modal-error {
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.admin-report-item,
+.admin-user-row {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.admin-report-item {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.admin-report-item p {
+  margin: 6px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-report-meta {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 12px 0 0;
+}
+
+.admin-report-meta dt {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.admin-report-meta dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-user-row {
+  align-items: center;
+  grid-template-columns: minmax(0, 1fr) minmax(130px, 180px) auto;
+}
+
+.admin-user-row span {
+  display: grid;
+  gap: 2px;
+}
+
+.admin-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
 
 
 @media (max-width: 860px) {
@@ -976,7 +1116,12 @@ button.danger:hover {
   .team-management-grid,
   .toolbar,
   .group-layout,
-  .detail-grid {
+  .detail-grid,
+  .admin-head,
+  .admin-report-item,
+  .admin-report-meta,
+  .admin-search,
+  .admin-user-row {
     grid-template-columns: 1fr;
   }
 

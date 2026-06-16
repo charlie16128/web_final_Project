@@ -4,6 +4,7 @@ import HomeView from '../views/HomeView.vue'
 import LoginView from '../views/LoginView.vue'
 import RegisterView from '../views/RegisterView.vue'
 import GroupView from '../views/GroupView.vue'
+import AdminView from '../views/AdminView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -29,6 +30,12 @@ const router = createRouter({
       name: 'group',
       component: GroupView,
       meta: { requiresAuth: true }
+    },
+    {
+      path: '/admin',
+      name: 'admin',
+      component: AdminView,
+      meta: { requiresAuth: true, requiresAdmin: true }
     }
   ]
 })
@@ -38,6 +45,13 @@ router.beforeEach((to) => {
 
   if (to.meta.requiresAuth && !token) {
     return { name: 'login' }
+  }
+
+  if (to.meta.requiresAdmin) {
+    const user = JSON.parse(localStorage.getItem('teamup_user') || 'null')
+    if (!user || (user.role !== 'admin' && user.role !== 'super_admin')) {
+      return { name: 'home' }
+    }
   }
 
   if (token && (to.name === 'login' || to.name === 'register')) {

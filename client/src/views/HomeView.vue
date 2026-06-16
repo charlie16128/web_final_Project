@@ -9,7 +9,7 @@
   />
 
   <main class="layout">
-    <GroupSidebar v-model="groupTab" :groups="groups" :applications="myApplications" />
+    <GroupSidebar v-model="groupTab" :groups="groups" :applications="myApplications" :user="user" />
 
     <div class="main-column">
       <ProjectForm @create="createProject" />
@@ -17,7 +17,7 @@
       <section class="panel invite-list">
         <div class="section-title">
           <h2>我的邀請</h2>
-          <p>回覆隊長邀請你加入的專題。</p>
+          <p>接受隊長邀請後，就會加入該隊伍。</p>
         </div>
 
         <div class="applications-list">
@@ -34,23 +34,23 @@
       </section>
 
       <section class="toolbar">
-        <input v-model.trim="filters.q" type="search" placeholder="搜尋專題、課程或技能" @input="scheduleProjectLoad">
+        <input v-model.trim="filters.q" type="search" placeholder="搜尋隊伍、課程或技能" @input="scheduleProjectLoad">
         <select v-model="filters.status" @change="loadProjects">
-          <option value="">全部狀態</option>
-          <option value="open">開放中</option>
-          <option value="full">已滿員</option>
+          <option value="">所有狀態</option>
+          <option value="open">招募中</option>
+          <option value="full">已額滿</option>
           <option value="closed">已關閉</option>
         </select>
         <button class="ghost" type="button" @click="loadProjects">重新整理</button>
         <select v-model="filters.filter" @change="loadProjects">
-          <option value="">全部專題</option>
-          <option value="favorited">已收藏</option>
+          <option value="">所有隊伍</option>
+          <option value="favorited">我的收藏</option>
         </select>
       </section>
 
       <section class="projects">
         <article v-if="!projects.length" class="project-card">
-          <p class="description">目前沒有符合條件的專題。</p>
+          <p class="description">目前沒有符合條件的隊伍。</p>
         </article>
 
         <ProjectCard
@@ -60,11 +60,22 @@
           :user="user"
           @apply="applyProject"
           @favorite="toggleFavorite"
+          @report="reportProject"
           @update-application="updateApplication"
         />
       </section>
     </div>
   </main>
+
+  <FloatingInputModal
+    v-if="reportProjectTarget"
+    title="檢舉隊伍"
+    label="檢舉訊息"
+    placeholder="請輸入檢舉原因"
+    submit-text="送出檢舉"
+    @close="reportProjectTarget = null"
+    @submit="submitProjectReport"
+  />
 
   <ToastMessage :message="toast" />
 </template>
@@ -75,6 +86,7 @@ import { useRouter } from 'vue-router'
 import api from '../services/api'
 import AccountModal from '../components/AccountModal.vue'
 import AppHeader from '../components/AppHeader.vue'
+import FloatingInputModal from '../components/FloatingInputModal.vue'
 import GroupSidebar from '../components/GroupSidebar.vue'
 import ProjectCard from '../components/ProjectCard.vue'
 import ProjectForm from '../components/ProjectForm.vue'
@@ -91,6 +103,7 @@ const groups = reactive({
 })
 const groupTab = ref('all')
 const showAccountModal = ref(false)
+const reportProjectTarget = ref(null)
 const toast = ref('')
 const filters = reactive({
   q: '',
@@ -149,7 +162,7 @@ function scheduleProjectLoad() {
   window.clearTimeout(searchTimer)
   searchTimer = window.setTimeout(() => {
     loadProjects().catch((error) => {
-      showToast(error.response?.data?.message || '專題載入失敗')
+      showToast(error.response?.data?.message || '搜尋載入失敗')
     })
   }, 250)
 }
@@ -178,10 +191,10 @@ async function loadMyInvitations() {
 async function createProject(form) {
   try {
     await api.post('/projects', form)
-    showToast('專題已建立')
+    showToast('隊伍已建立')
     await Promise.all([loadProjects(), loadGroups()])
   } catch (error) {
-    showToast(error.response?.data?.message || '建立專題失敗')
+    showToast(error.response?.data?.message || '建立隊伍失敗')
   }
 }
 
@@ -190,7 +203,7 @@ async function toggleFavorite(project) {
     if (project.is_favorited) {
       await api.delete(`/projects/${project.id}/favorite`)
       project.is_favorited = false
-      showToast('已取消收藏')
+      showToast('已移除收藏')
     } else {
       await api.post(`/projects/${project.id}/favorite`)
       project.is_favorited = true
@@ -211,10 +224,33 @@ async function applyProject(project) {
       message: project.applyMessage
     })
     project.applyMessage = ''
-    showToast('已送出加入申請')
+    showToast('申請已送出')
     await Promise.all([loadProjects(), loadMyApplications()])
   } catch (error) {
     showToast(error.response?.data?.message || '申請失敗')
+  }
+}
+
+function reportProject(project) {
+  reportProjectTarget.value = project
+}
+
+async function submitProjectReport(payload) {
+  if (!reportProjectTarget.value) {
+    return
+  }
+
+  try {
+    await api.post('/reports', {
+      target_user_id: reportProjectTarget.value.owner_id,
+      target_project_id: reportProjectTarget.value.id,
+      reason: payload.message,
+      detail: ''
+    })
+    reportProjectTarget.value = null
+    showToast('檢舉已送出，管理員會盡快處理')
+  } catch (error) {
+    showToast(error.response?.data?.message || '檢舉送出失敗')
   }
 }
 
