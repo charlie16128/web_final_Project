@@ -31,10 +31,12 @@ function setFieldState(label, invalid) {
 
   if (invalid) {
     field.setAttribute('aria-invalid', 'true')
+    field.classList.add('input-error')
     return
   }
 
   field.removeAttribute('aria-invalid')
+  field.classList.remove('input-error')
 }
 
 function validateForm(form) {

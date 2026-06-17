@@ -166,16 +166,21 @@ async function groupOrAdminForUser(projectId, userId) {
     return null;
   }
 
+  var memberProject = await groupForUser(projectId, userId);
+  if (memberProject) {
+    return memberProject;
+  }
+
   if (isAdminRole(user)) {
     var adminProject = await db.get(
-      'SELECT projects.*, users.name AS owner_name, users.role AS owner_role, "admin" AS relation ' +
+      'SELECT projects.*, users.name AS owner_name, users.role AS owner_role, "admin" AS relation, "admin" AS group_role ' +
         'FROM projects JOIN users ON users.student_id = projects.owner_id WHERE projects.id = ?',
       [projectId]
     );
     return adminProject || null;
   }
 
-  return groupForUser(projectId, userId);
+  return null;
 }
 
 async function manageableProjectForUser(projectId, userId) {
@@ -189,8 +194,55 @@ async function manageableProjectForUser(projectId, userId) {
     return null;
   }
 
-  project.can_manage = project.owner_id === user.student_id || isAdminRole(user);
+  project.group_role = await getGroupRole(projectId, user.student_id);
+  project.can_manage = canManageGroup(project.group_role) || isAdminRole(user);
+  project.can_transfer_leader = project.group_role === 'leader' || isAdminRole(user);
+  project.can_delete_group = project.group_role === 'leader' || isAdminRole(user);
   return project;
+}
+
+async function getGroupRole(projectId, userId) {
+  var project = await db.get('SELECT owner_id FROM projects WHERE id = ?', [projectId]);
+  if (!project) {
+    return null;
+  }
+  if (project.owner_id === userId) {
+    return 'leader';
+  }
+
+  var membership = await db.get(
+    'SELECT role FROM applications WHERE project_id = ? AND user_id = ? AND status = "accepted"',
+    [projectId, userId]
+  );
+  if (!membership) {
+    return null;
+  }
+  return membership.role === 'vice_leader' ? 'vice_leader' : 'member';
+}
+
+function canManageGroup(groupRole) {
+  return groupRole === 'leader' || groupRole === 'vice_leader';
+}
+
+async function groupMemberById(projectId, memberId) {
+  var project = await db.get(
+    'SELECT users.student_id AS id, users.student_id, users.name, users.username, users.email, users.role, ' +
+      '"owned" AS relation, "leader" AS group_role, projects.created_at AS joined_at ' +
+      'FROM projects JOIN users ON users.student_id = projects.owner_id ' +
+      'WHERE projects.id = ? AND users.student_id = ?',
+    [projectId, memberId]
+  );
+  if (project) {
+    return project;
+  }
+
+  return db.get(
+    'SELECT users.student_id AS id, users.student_id, users.name, users.username, users.email, users.role, ' +
+      '"joined" AS relation, COALESCE(applications.role, "member") AS group_role, applications.created_at AS joined_at ' +
+      'FROM applications JOIN users ON users.student_id = applications.user_id ' +
+      'WHERE applications.project_id = ? AND applications.user_id = ? AND applications.status = "accepted"',
+    [projectId, memberId]
+  );
 }
 
 router.post('/register', asyncHandler(async function(req, res) {
@@ -726,7 +778,7 @@ router.delete('/projects/:id/favorite', auth.authRequired, asyncHandler(async fu
   res.json({ favorited: false });
 }));
 
-router.post('/projects/:id/invitations', auth.authRequired, asyncHandler(async function(req, res) {
+async function createProjectInvitation(req, res) {
   var project = await syncProjectCapacity(req.params.id);
   if (!project) {
     res.status(404).json({ message: '找不到專題' });
@@ -787,7 +839,10 @@ router.post('/projects/:id/invitations', auth.authRequired, asyncHandler(async f
   );
 
   res.status(201).json({ invitation: await invitationById(result.id) });
-}));
+}
+
+router.post('/projects/:id/invitations', auth.authRequired, asyncHandler(createProjectInvitation));
+router.post('/groups/:id/invitations', auth.authRequired, asyncHandler(createProjectInvitation));
 
 router.get('/me/invitations', auth.authRequired, asyncHandler(async function(req, res) {
   var invitations = await db.all(
@@ -834,10 +889,10 @@ router.post('/invitations/:id/accept', auth.authRequired, asyncHandler(async fun
   }
 
   if (existingApplication) {
-    await db.run('UPDATE applications SET status = "accepted" WHERE id = ?', [existingApplication.id]);
+    await db.run('UPDATE applications SET status = "accepted", role = "member" WHERE id = ?', [existingApplication.id]);
   } else {
     await db.run(
-      'INSERT INTO applications (project_id, user_id, message, status) VALUES (?, ?, ?, "accepted")',
+      'INSERT INTO applications (project_id, user_id, message, status, role) VALUES (?, ?, ?, "accepted", "member")',
       [invitation.project_id, req.user.student_id, invitation.message || '']
     );
   }
@@ -897,8 +952,8 @@ router.post('/projects/:id/transfer-owner', auth.authRequired, asyncHandler(asyn
     res.status(404).json({ message: '找不到專題' });
     return;
   }
-  if (!project.can_manage) {
-    res.status(403).json({ message: '只有隊長或管理員可以轉移隊長身份' });
+  if (!project.can_transfer_leader) {
+    res.status(403).json({ message: '只有隊長可以轉移隊長身份' });
     return;
   }
   if (!required(req.body.user_id)) {
@@ -928,10 +983,10 @@ router.post('/projects/:id/transfer-owner', auth.authRequired, asyncHandler(asyn
     [req.params.id, project.owner_id]
   );
   if (oldOwnerMembership) {
-    await db.run('UPDATE applications SET status = "accepted" WHERE id = ?', [oldOwnerMembership.id]);
+    await db.run('UPDATE applications SET status = "accepted", role = "member" WHERE id = ?', [oldOwnerMembership.id]);
   } else {
     await db.run(
-      'INSERT INTO applications (project_id, user_id, message, status) VALUES (?, ?, ?, "accepted")',
+      'INSERT INTO applications (project_id, user_id, message, status, role) VALUES (?, ?, ?, "accepted", "member")',
       [req.params.id, project.owner_id, 'Former project owner']
     );
   }
@@ -958,13 +1013,13 @@ router.post('/projects/:id/transfer-owner', auth.authRequired, asyncHandler(asyn
 
 router.get('/groups/me', auth.authRequired, asyncHandler(async function(req, res) {
   var owned = await db.all(
-    'SELECT projects.*, users.name AS owner_name, users.role AS owner_role, "owned" AS relation ' +
+    'SELECT projects.*, users.name AS owner_name, users.role AS owner_role, "owned" AS relation, "leader" AS group_role ' +
       'FROM projects JOIN users ON users.student_id = projects.owner_id ' +
       'WHERE projects.owner_id = ? ORDER BY projects.created_at DESC',
     [req.user.student_id]
   );
   var joined = await db.all(
-    'SELECT projects.*, users.name AS owner_name, users.role AS owner_role, applications.created_at AS joined_at, "joined" AS relation ' +
+    'SELECT projects.*, users.name AS owner_name, users.role AS owner_role, applications.created_at AS joined_at, "joined" AS relation, COALESCE(applications.role, "member") AS group_role ' +
       'FROM applications ' +
       'JOIN projects ON projects.id = applications.project_id ' +
       'JOIN users ON users.student_id = projects.owner_id ' +
@@ -982,7 +1037,10 @@ router.get('/groups/:id', auth.authRequired, asyncHandler(async function(req, re
     res.status(404).json({ message: '找不到可存取的群組' });
     return;
   }
-  project.can_manage = project.owner_id === req.user.student_id || isAdminRole(user);
+  project.group_role = project.relation === 'admin' ? 'admin' : await getGroupRole(req.params.id, req.user.student_id);
+  project.can_manage = canManageGroup(project.group_role) || isAdminRole(user);
+  project.can_transfer_leader = project.group_role === 'leader' || isAdminRole(user);
+  project.can_delete_group = project.group_role === 'leader' || isAdminRole(user);
   project.can_view_private_area = ['owned', 'joined', 'admin'].indexOf(project.relation) >= 0;
   res.json({ group: project });
 }));
@@ -995,17 +1053,52 @@ router.get('/groups/:id/members', auth.authRequired, asyncHandler(async function
   }
 
   var members = await db.all(
-    'SELECT users.student_id AS id, users.student_id, users.name, users.username, users.email, users.role, "owned" AS relation, projects.created_at AS joined_at ' +
+    'SELECT users.student_id AS id, users.student_id, users.name, users.username, users.email, users.role, "owned" AS relation, "leader" AS group_role, projects.created_at AS joined_at ' +
       'FROM projects JOIN users ON users.student_id = projects.owner_id ' +
       'WHERE projects.id = ? ' +
       'UNION ALL ' +
-      'SELECT users.student_id AS id, users.student_id, users.name, users.username, users.email, users.role, "joined" AS relation, applications.created_at AS joined_at ' +
+      'SELECT users.student_id AS id, users.student_id, users.name, users.username, users.email, users.role, "joined" AS relation, COALESCE(applications.role, "member") AS group_role, applications.created_at AS joined_at ' +
       'FROM applications JOIN users ON users.student_id = applications.user_id ' +
       'WHERE applications.project_id = ? AND applications.status = "accepted" AND users.student_id != ? ' +
       'ORDER BY relation DESC, joined_at ASC',
     [req.params.id, req.params.id, project.owner_id]
   );
   res.json({ members: members });
+}));
+
+router.patch('/groups/:id/members/:memberId/role', auth.authRequired, asyncHandler(async function(req, res) {
+  var project = await manageableProjectForUser(req.params.id, req.user.student_id);
+  if (!project) {
+    res.status(404).json({ message: '找不到專題' });
+    return;
+  }
+  if (project.group_role !== 'leader') {
+    res.status(403).json({ message: '只有隊長可以調整隊伍角色' });
+    return;
+  }
+
+  var nextRole = req.body.role;
+  if (nextRole !== 'vice_leader' && nextRole !== 'member') {
+    res.status(400).json({ message: '隊伍角色只能是 vice_leader 或 member' });
+    return;
+  }
+
+  var memberId = String(req.params.memberId).trim();
+  if (memberId === project.owner_id) {
+    res.status(400).json({ message: '隊長角色請透過轉移隊長調整' });
+    return;
+  }
+
+  var updated = await db.run(
+    'UPDATE applications SET role = ? WHERE project_id = ? AND user_id = ? AND status = "accepted"',
+    [nextRole, req.params.id, memberId]
+  );
+  if (!updated.changes) {
+    res.status(404).json({ message: '找不到此隊員' });
+    return;
+  }
+
+  res.json({ member: await groupMemberById(req.params.id, memberId) });
 }));
 
 router.delete('/groups/:id/members/:memberId', auth.authRequired, asyncHandler(async function(req, res) {
@@ -1033,6 +1126,10 @@ router.delete('/groups/:id/members/:memberId', auth.authRequired, asyncHandler(a
   );
   if (!membership) {
     res.status(404).json({ message: '找不到此隊員' });
+    return;
+  }
+  if (project.group_role === 'vice_leader' && membership.role === 'vice_leader') {
+    res.status(403).json({ message: '副隊長不能移除其他副隊長' });
     return;
   }
 
@@ -1315,7 +1412,7 @@ router.post('/projects', auth.authRequired, asyncHandler(async function(req, res
   res.status(201).json({ project: project });
 }));
 
-router.put('/projects/:id', auth.authRequired, asyncHandler(async function(req, res) {
+async function updateProjectDetails(req, res) {
   var project = await manageableProjectForUser(req.params.id, req.user.student_id);
   if (!project) {
     res.status(404).json({ message: '找不到專題' });
@@ -1348,21 +1445,27 @@ router.put('/projects/:id', auth.authRequired, asyncHandler(async function(req, 
     ]
   );
   res.json({ project: await db.get('SELECT * FROM projects WHERE id = ?', [req.params.id]) });
-}));
+}
 
-router.delete('/projects/:id', auth.authRequired, asyncHandler(async function(req, res) {
+router.put('/projects/:id', auth.authRequired, asyncHandler(updateProjectDetails));
+router.patch('/groups/:id', auth.authRequired, asyncHandler(updateProjectDetails));
+
+async function deleteProjectGroup(req, res) {
   var project = await manageableProjectForUser(req.params.id, req.user.student_id);
   if (!project) {
     res.status(404).json({ message: '找不到專題' });
     return;
   }
-  if (!project.can_manage) {
-    res.status(403).json({ message: '只有建立者或管理員可以刪除專題' });
+  if (!project.can_delete_group) {
+    res.status(403).json({ message: '只有隊長或管理員可以刪除專題' });
     return;
   }
   await db.run('DELETE FROM projects WHERE id = ?', [req.params.id]);
   res.json({ message: '專題已刪除' });
-}));
+}
+
+router.delete('/projects/:id', auth.authRequired, asyncHandler(deleteProjectGroup));
+router.delete('/groups/:id', auth.authRequired, asyncHandler(deleteProjectGroup));
 
 router.post('/projects/:id/apply', auth.authRequired, asyncHandler(async function(req, res) {
   var project = await db.get('SELECT * FROM projects WHERE id = ?', [req.params.id]);
@@ -1488,7 +1591,10 @@ router.put('/applications/:id', auth.authRequired, asyncHandler(async function(r
     return;
   }
 
-  await db.run('UPDATE applications SET status = ? WHERE id = ?', [req.body.status, req.params.id]);
+  await db.run(
+    'UPDATE applications SET status = ?, role = CASE WHEN ? = "accepted" THEN COALESCE(role, "member") ELSE role END WHERE id = ?',
+    [req.body.status, req.body.status, req.params.id]
+  );
   if (req.body.status === 'accepted' && application.status !== 'accepted') {
     await db.run(
       'UPDATE projects SET current_members = current_members + 1, status = CASE WHEN current_members + 1 >= max_members THEN "full" ELSE "open" END WHERE id = ?',
@@ -1614,29 +1720,32 @@ function groupForUser(projectId, userId) {
         'WHEN projects.owner_id = ? THEN "owned" ' +
         'WHEN applications.status = "accepted" THEN "joined" ' +
         'WHEN applications.status = "pending" THEN "pending" ' +
-      'END AS relation ' +
+      'END AS relation, ' +
+      'CASE ' +
+        'WHEN projects.owner_id = ? THEN "leader" ' +
+        'WHEN applications.status = "accepted" THEN COALESCE(applications.role, "member") ' +
+        'ELSE NULL ' +
+      'END AS group_role ' +
       'FROM projects JOIN users ON users.student_id = projects.owner_id ' +
       'LEFT JOIN applications ON applications.project_id = projects.id AND applications.user_id = ? ' +
       'WHERE projects.id = ? AND (' +
         'projects.owner_id = ? OR applications.status IN ("accepted", "pending")' +
       ')',
-    [userId, userId, projectId, userId]
+    [userId, userId, userId, projectId, userId]
   );
 }
 
 async function groupMemberForUser(projectId, userId) {
   var user = await currentUser(userId);
-  if (isAdminRole(user)) {
-    return db.get(
-      'SELECT projects.*, users.name AS owner_name, users.role AS owner_role, "admin" AS relation ' +
-        'FROM projects JOIN users ON users.student_id = projects.owner_id WHERE projects.id = ?',
-      [projectId]
-    );
-  }
-
-  return db.get(
+  var memberProject = await db.get(
     'SELECT projects.*, users.name AS owner_name, users.role AS owner_role, ' +
-      'CASE WHEN projects.owner_id = ? THEN "owned" ELSE "joined" END AS relation ' +
+      'CASE WHEN projects.owner_id = ? THEN "owned" ELSE "joined" END AS relation, ' +
+      'CASE WHEN projects.owner_id = ? THEN "leader" ELSE COALESCE((' +
+        'SELECT role FROM applications ' +
+        'WHERE applications.project_id = projects.id ' +
+        'AND applications.user_id = ? ' +
+        'AND applications.status = "accepted"' +
+      '), "member") END AS group_role ' +
       'FROM projects JOIN users ON users.student_id = projects.owner_id ' +
       'WHERE projects.id = ? AND (' +
         'projects.owner_id = ? OR EXISTS (' +
@@ -1646,8 +1755,21 @@ async function groupMemberForUser(projectId, userId) {
           'AND applications.status = "accepted"' +
         ')' +
       ')',
-    [userId, projectId, userId, userId]
+    [userId, userId, userId, projectId, userId, userId]
   );
+  if (memberProject) {
+    return memberProject;
+  }
+
+  if (isAdminRole(user)) {
+    return db.get(
+      'SELECT projects.*, users.name AS owner_name, users.role AS owner_role, "admin" AS relation, "admin" AS group_role ' +
+        'FROM projects JOIN users ON users.student_id = projects.owner_id WHERE projects.id = ?',
+      [projectId]
+    );
+  }
+
+  return null;
 }
 
 router.use(function(err, req, res, next) {

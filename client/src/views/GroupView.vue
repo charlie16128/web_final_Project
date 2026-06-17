@@ -149,24 +149,62 @@
 
         <div class="team-management-actions team-management-grid">
           <button type="button" :disabled="isGroupFull" @click="inviteModalOpen = true">邀請成員</button>
-          <button type="button" :disabled="!transferableMembers.length" @click="transferModalOpen = true">轉移隊長</button>
+          <button
+            v-if="canTransferLeader"
+            type="button"
+            :disabled="!canTransferLeader || !transferableMembers.length"
+            @click="transferModalOpen = true"
+          >
+            轉移隊長
+          </button>
+          <button
+            v-if="canDeleteGroup"
+            class="ghost danger delete-group-action"
+            type="button"
+            @click="deleteGroup"
+          >
+            刪除隊伍
+          </button>
         </div>
         <p v-if="isGroupFull" class="mini-item">隊伍已額滿，無法再邀請新成員。</p>
 
         <div class="invite-list">
           <div v-for="member in members" :key="member.id" class="mini-item member-row">
-            <span>
+            <span class="member-summary">
               <b><DisplayName :name="member.name" :role="member.role" /></b>
-              <small>{{ member.relation === 'owned' ? '隊長' : '隊員' }}</small>
+              <small
+                class="group-role-badge"
+                :class="groupRoleClass(member.group_role)"
+              >
+                {{ groupRoleLabel(member.group_role) }}
+              </small>
             </span>
-            <button
-              v-if="member.relation === 'joined'"
-              class="ghost danger compact-action"
-              type="button"
-              @click="removeMember(member)"
-            >
-              移除
-            </button>
+            <div class="member-role-actions">
+              <button
+                v-if="canSetViceLeader(member) && member.group_role !== 'vice_leader'"
+                class="ghost compact-action role-action"
+                type="button"
+                @click="promoteMember(member)"
+              >
+                設為副隊長
+              </button>
+              <button
+                v-if="canSetViceLeader(member) && member.group_role === 'vice_leader'"
+                class="ghost compact-action role-action"
+                type="button"
+                @click="demoteMember(member)"
+              >
+                取消副隊長
+              </button>
+              <button
+                v-if="canRemoveMember(member)"
+                class="ghost danger compact-action"
+                type="button"
+                @click="removeMember(member)"
+              >
+                移除
+              </button>
+            </div>
           </div>
         </div>
       </section>
@@ -342,12 +380,11 @@
       <form class="stack team-management-form transfer-owner-form" @submit.prevent="transferOwner">
         <label data-required data-error="*請選擇成員">
           新隊長
-          <select v-model="transferForm.user_id">
-            <option value="" disabled>選擇隊員</option>
-            <option v-for="member in transferableMembers" :key="member.id" :value="member.id">
-              {{ member.name }}
-            </option>
-          </select>
+          <CustomSelect
+            v-model="transferForm.user_id"
+            :options="transferMemberOptions"
+            placeholder="選擇隊員"
+          />
         </label>
         <div class="form-actions team-modal-actions">
           <button class="ghost team-modal-button" type="button" @click="closeTransferModal">取消</button>
@@ -365,6 +402,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '../services/api'
 import AppHeader from '../components/AppHeader.vue'
+import CustomSelect from '../components/common/CustomSelect.vue'
 import DisplayName from '../components/DisplayName.vue'
 import FloatingInputModal from '../components/FloatingInputModal.vue'
 import ToastMessage from '../components/ToastMessage.vue'
@@ -443,7 +481,6 @@ const canUseDiscussion = computed(() => (
 ))
 
 const canShowMembershipAction = computed(() => (
-  group.value?.relation === 'owned' ||
   group.value?.relation === 'joined' ||
   group.value?.relation === 'pending'
 ))
@@ -455,12 +492,27 @@ const canManageGroupDetails = computed(() => (
   user.value?.role === 'super_admin'
 ))
 
+const canTransferLeader = computed(() => (
+  Boolean(group.value?.can_transfer_leader)
+))
+
+const canDeleteGroup = computed(() => (
+  Boolean(group.value?.can_delete_group)
+))
+
 const isGroupFull = computed(() => (
   Number(group.value?.current_members || 0) >= Number(group.value?.max_members || 0)
 ))
 
 const transferableMembers = computed(() => (
   members.value.filter((member) => member.relation === 'joined')
+))
+
+const transferMemberOptions = computed(() => (
+  transferableMembers.value.map((member) => ({
+    label: member.name,
+    value: member.id
+  }))
 ))
 
 const announcementSummary = computed(() => {
@@ -659,7 +711,7 @@ function cancelEditForm() {
 
 async function saveProject() {
   try {
-    await api.put(`/projects/${group.value.id}`, {
+    await api.patch(`/groups/${group.value.id}`, {
       title: editForm.title,
       course_name: editForm.course_name,
       teacher_name: editForm.teacher_name,
@@ -698,7 +750,7 @@ async function inviteMember() {
   }
 
   try {
-    await api.post(`/projects/${group.value.id}/invitations`, {
+    await api.post(`/groups/${group.value.id}/invitations`, {
       user_id: inviteForm.user_id,
       message: inviteForm.message
     })
@@ -708,6 +760,55 @@ async function inviteMember() {
   } catch (error) {
     showToast(error.response?.data?.message || '送出邀請失敗')
   }
+}
+
+function groupRoleLabel(role) {
+  if (role === 'leader') {
+    return '隊長'
+  }
+  if (role === 'vice_leader') {
+    return '副隊長'
+  }
+  if (role === 'admin') {
+    return '管理員'
+  }
+  return '隊員'
+}
+
+function groupRoleClass(role) {
+  return `role-${role || 'member'}`
+}
+
+function canSetViceLeader(member) {
+  return group.value?.group_role === 'leader' && member.relation === 'joined'
+}
+
+function canRemoveMember(member) {
+  if (member.relation !== 'joined' || !canManageGroupDetails.value) {
+    return false
+  }
+  if (group.value?.group_role === 'vice_leader' && member.group_role === 'vice_leader') {
+    return false
+  }
+  return true
+}
+
+async function updateMemberRole(member, role) {
+  try {
+    await api.patch(`/groups/${group.value.id}/members/${member.id}/role`, { role })
+    showToast(role === 'vice_leader' ? '已設為副隊長' : '已取消副隊長')
+    await loadGroup()
+  } catch (error) {
+    showToast(error.response?.data?.message || '更新隊伍角色失敗')
+  }
+}
+
+function promoteMember(member) {
+  return updateMemberRole(member, 'vice_leader')
+}
+
+function demoteMember(member) {
+  return updateMemberRole(member, 'member')
 }
 
 async function transferOwner() {
@@ -873,7 +974,7 @@ async function handleMembershipAction() {
 
   try {
     if (group.value.relation === 'owned') {
-      await api.delete(`/projects/${group.value.id}`)
+      await api.delete(`/groups/${group.value.id}`)
       showToast('隊伍已刪除')
     } else {
       await api.delete(`/groups/${group.value.id}/membership`)
@@ -885,6 +986,22 @@ async function handleMembershipAction() {
     }, 500)
   } catch (error) {
     showToast(error.response?.data?.message || '操作失敗')
+  }
+}
+
+async function deleteGroup() {
+  if (!group.value || !window.confirm('確定要刪除這個隊伍嗎？此操作無法復原。')) {
+    return
+  }
+
+  try {
+    await api.delete(`/groups/${group.value.id}`)
+    showToast('隊伍已刪除')
+    window.setTimeout(() => {
+      router.replace({ name: 'home' })
+    }, 500)
+  } catch (error) {
+    showToast(error.response?.data?.message || '刪除隊伍失敗')
   }
 }
 

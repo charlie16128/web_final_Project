@@ -26,7 +26,7 @@ test('group detail wires owner invitation and leader transfer controls', functio
   assert.match(groupView, /loadMembers/);
   assert.match(groupView, /\/groups\/\$\{route\.params\.id\}\/members/);
   assert.match(groupView, /\/groups\/\$\{group\.value\.id\}\/members\/\$\{member\.id\}/);
-  assert.match(groupView, /\/projects\/\$\{group\.value\.id\}\/invitations/);
+  assert.match(groupView, /\/groups\/\$\{group\.value\.id\}\/invitations/);
   assert.match(groupView, /\/projects\/\$\{group\.value\.id\}\/transfer-owner/);
   assert.match(groupView, /isGroupFull/);
   assert.match(groupView, /:disabled="isGroupFull"/);

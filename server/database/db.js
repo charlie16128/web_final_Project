@@ -261,12 +261,15 @@ async function createCurrentSchema() {
       'user_id TEXT NOT NULL,' +
       'message TEXT,' +
       'status TEXT DEFAULT "pending",' +
+      'role TEXT DEFAULT "member",' +
       'created_at TEXT DEFAULT CURRENT_TIMESTAMP,' +
       'UNIQUE(project_id, user_id),' +
       'FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE,' +
       'FOREIGN KEY(user_id) REFERENCES users(student_id) ON DELETE CASCADE' +
     ')'
   );
+  await addColumn('applications', 'role TEXT DEFAULT "member"');
+  await rawRun('UPDATE applications SET role = "member" WHERE role IS NULL OR role = ""');
   await rawRun(
     'CREATE TABLE IF NOT EXISTS comments (' +
       'id INTEGER PRIMARY KEY AUTOINCREMENT,' +

@@ -7,28 +7,50 @@
     </section>
 
     <section class="panel auth-card">
-      <form class="stack" @submit.prevent="register">
-        <label data-required data-error="*請輸入姓名">姓名<input v-model.trim="form.name" autofocus autocomplete="name"></label>
-        <label data-required data-error="*學號格式為 D 加 7 位數字">學號
-          <input
-            v-model.trim="form.student_id"
-            minlength="8"
-            maxlength="8"
-            pattern="D[0-9]{7}"
-            title="學號格式為 D 加 7 位數字，例如 D1234567"
-          >
-        </label>
-        <label data-required data-error="*請輸入電子郵件">Email<input v-model.trim="form.email" type="email" autocomplete="email"></label>
-        <label data-required data-error="*密碼至少 6 碼，僅能使用英文或數字">密碼
-          <input
-            v-model="form.password"
-            type="password"
-            minlength="6"
-            pattern="[A-Za-z0-9]{6,}"
-            title="密碼至少 6 碼，限英文字母與數字"
-            autocomplete="new-password"
-          >
-        </label>
+      <form class="stack auth-form" @submit.prevent="register">
+        <div class="form-field">
+          <label data-required data-error="*請輸入姓名">
+            姓名
+            <input class="auth-input" v-model.trim="form.name" autofocus autocomplete="name">
+          </label>
+          <p class="field-error">*請輸入姓名</p>
+        </div>
+        <div class="form-field">
+          <label data-required data-error="*學號格式為 D 加 7 位數字">
+            學號
+            <input
+              class="auth-input"
+              v-model.trim="form.student_id"
+              minlength="8"
+              maxlength="8"
+              pattern="D[0-9]{7}"
+              title="學號格式為 D 加 7 位數字，例如 D1234567"
+            >
+          </label>
+          <p class="field-error">*學號格式為 D 加 7 位數字</p>
+        </div>
+        <div class="form-field">
+          <label data-required data-error="*請輸入電子郵件">
+            Email
+            <input class="auth-input" v-model.trim="form.email" type="email" autocomplete="email">
+          </label>
+          <p class="field-error">*請輸入電子郵件</p>
+        </div>
+        <div class="form-field">
+          <label data-required data-error="*密碼至少 6 碼，僅能使用英文或數字">
+            密碼
+            <input
+              class="auth-input"
+              v-model="form.password"
+              type="password"
+              minlength="6"
+              pattern="[A-Za-z0-9]{6,}"
+              title="密碼至少 6 碼，限英文字母與數字"
+              autocomplete="new-password"
+            >
+          </label>
+          <p class="field-error">*密碼至少 6 碼，僅能使用英文或數字</p>
+        </div>
         <button type="submit" :disabled="loading">{{ loading ? '註冊中...' : '註冊' }}</button>
       </form>
       <p class="auth-link">已有帳號？<RouterLink :to="{ name: 'login' }">前往登入</RouterLink></p>

@@ -35,17 +35,19 @@
 
       <section class="toolbar">
         <input v-model.trim="filters.q" type="search" placeholder="搜尋隊伍、課程或技能" @input="scheduleProjectLoad">
-        <select v-model="filters.status" @change="loadProjects">
-          <option value="">所有狀態</option>
-          <option value="open">招募中</option>
-          <option value="full">已額滿</option>
-          <option value="closed">已關閉</option>
-        </select>
+        <CustomSelect
+          v-model="filters.status"
+          :options="statusOptions"
+          placeholder="所有狀態"
+          @update:modelValue="loadProjects"
+        />
         <button class="ghost" type="button" @click="loadProjects">重新整理</button>
-        <select v-model="filters.filter" @change="loadProjects">
-          <option value="">所有隊伍</option>
-          <option value="favorited">我的收藏</option>
-        </select>
+        <CustomSelect
+          v-model="filters.filter"
+          :options="filterOptions"
+          placeholder="所有隊伍"
+          @update:modelValue="loadProjects"
+        />
       </section>
 
       <section class="projects">
@@ -86,6 +88,7 @@ import { useRouter } from 'vue-router'
 import api from '../services/api'
 import AccountModal from '../components/AccountModal.vue'
 import AppHeader from '../components/AppHeader.vue'
+import CustomSelect from '../components/common/CustomSelect.vue'
 import FloatingInputModal from '../components/FloatingInputModal.vue'
 import GroupSidebar from '../components/GroupSidebar.vue'
 import ProjectCard from '../components/ProjectCard.vue'
@@ -110,6 +113,18 @@ const filters = reactive({
   status: '',
   filter: ''
 })
+
+const statusOptions = [
+  { label: '所有狀態', value: '' },
+  { label: '招募中', value: 'open' },
+  { label: '已額滿', value: 'full' },
+  { label: '已關閉', value: 'closed' }
+]
+
+const filterOptions = [
+  { label: '所有隊伍', value: '' },
+  { label: '我的收藏', value: 'favorited' }
+]
 
 let toastTimer = 0
 let searchTimer = 0

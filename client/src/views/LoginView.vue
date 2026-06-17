@@ -7,9 +7,21 @@
     </section>
 
     <section class="panel auth-card">
-      <form class="stack" @submit.prevent="login">
-        <label data-required data-error="*請輸入電子郵件">Email<input v-model.trim="form.email" type="email" autofocus autocomplete="email"></label>
-        <label data-required data-error="*請輸入密碼">密碼<input v-model="form.password" type="password" autocomplete="current-password"></label>
+      <form class="stack auth-form" @submit.prevent="login">
+        <div class="form-field">
+          <label data-required data-error="*請輸入電子郵件">
+            Email
+            <input class="auth-input" v-model.trim="form.email" type="email" autofocus autocomplete="email">
+          </label>
+          <p class="field-error">*請輸入電子郵件</p>
+        </div>
+        <div class="form-field">
+          <label data-required data-error="*請輸入密碼">
+            密碼
+            <input class="auth-input" v-model="form.password" type="password" autocomplete="current-password">
+          </label>
+          <p class="field-error">*請輸入密碼</p>
+        </div>
         <button type="submit" :disabled="loading">{{ loading ? '登入中...' : '登入' }}</button>
       </form>
       <p class="auth-link">還沒有帳號？<RouterLink :to="{ name: 'register' }">前往註冊</RouterLink></p>

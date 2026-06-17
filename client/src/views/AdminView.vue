@@ -74,15 +74,12 @@
             <small v-if="member.is_suspended">停權中：{{ member.suspended_reason || '未填寫原因' }}</small>
           </span>
 
-          <select
-            :value="member.role"
+          <CustomSelect
+            :model-value="member.role"
+            :options="roleOptions(member)"
             :disabled="member.role === 'super_admin'"
-            @change="updateRole(member, $event.target.value)"
-          >
-            <option value="user">user</option>
-            <option value="admin">admin</option>
-            <option v-if="member.role === 'super_admin'" value="super_admin">super_admin</option>
-          </select>
+            @update:modelValue="updateRole(member, $event)"
+          />
 
           <div class="admin-actions">
             <button class="ghost compact-action" type="button" :disabled="member.role === 'super_admin'" @click="openWarnUser(member)">
@@ -120,6 +117,7 @@ import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../services/api'
 import AppHeader from '../components/AppHeader.vue'
+import CustomSelect from '../components/common/CustomSelect.vue'
 import FloatingInputModal from '../components/FloatingInputModal.vue'
 import ToastMessage from '../components/ToastMessage.vue'
 
@@ -154,6 +152,19 @@ function showToast(message) {
 
 function isAdmin(currentUser) {
   return currentUser?.role === 'admin' || currentUser?.role === 'super_admin'
+}
+
+function roleOptions(member) {
+  const options = [
+    { label: 'user', value: 'user' },
+    { label: 'admin', value: 'admin' }
+  ]
+
+  if (member.role === 'super_admin') {
+    options.push({ label: 'super_admin', value: 'super_admin' })
+  }
+
+  return options
 }
 
 async function loadUser() {
