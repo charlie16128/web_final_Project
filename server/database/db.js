@@ -216,6 +216,8 @@ async function createCurrentSchema() {
       'github_url TEXT,' +
       'is_suspended INTEGER DEFAULT 0,' +
       'suspended_until TEXT,' +
+      'banned_until TEXT,' +
+      'token_version INTEGER DEFAULT 0,' +
       'suspended_reason TEXT,' +
       'created_at TEXT DEFAULT CURRENT_TIMESTAMP' +
     ')'
@@ -228,10 +230,14 @@ async function createCurrentSchema() {
   await addColumn('users', 'github_url TEXT');
   await addColumn('users', 'is_suspended INTEGER DEFAULT 0');
   await addColumn('users', 'suspended_until TEXT');
+  await addColumn('users', 'banned_until TEXT');
+  await addColumn('users', 'token_version INTEGER DEFAULT 0');
   await addColumn('users', 'suspended_reason TEXT');
   await rawRun('UPDATE users SET username = name WHERE username IS NULL OR username = ""');
   await rawRun('UPDATE users SET role = "user" WHERE role IS NULL OR role = ""');
   await rawRun('UPDATE users SET is_suspended = 0 WHERE is_suspended IS NULL');
+  await rawRun('UPDATE users SET token_version = 0 WHERE token_version IS NULL');
+  await rawRun('UPDATE users SET banned_until = suspended_until WHERE banned_until IS NULL AND suspended_until IS NOT NULL');
   await rawRun('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(username) WHERE username IS NOT NULL');
 
   await rawRun(
@@ -325,6 +331,20 @@ async function createCurrentSchema() {
       'created_at TEXT DEFAULT CURRENT_TIMESTAMP,' +
       'updated_at TEXT,' +
       'FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE' +
+    ')'
+  );
+  await rawRun(
+    'CREATE TABLE IF NOT EXISTS group_countdowns (' +
+      'id INTEGER PRIMARY KEY AUTOINCREMENT,' +
+      'group_id INTEGER NOT NULL,' +
+      'title TEXT NOT NULL,' +
+      'description TEXT,' +
+      'target_time TEXT NOT NULL,' +
+      'created_by TEXT NOT NULL,' +
+      'created_at TEXT DEFAULT CURRENT_TIMESTAMP,' +
+      'updated_at TEXT DEFAULT CURRENT_TIMESTAMP,' +
+      'FOREIGN KEY(group_id) REFERENCES projects(id) ON DELETE CASCADE,' +
+      'FOREIGN KEY(created_by) REFERENCES users(student_id) ON DELETE CASCADE' +
     ')'
   );
   await rawRun(
@@ -438,6 +458,8 @@ async function copyLegacyData(legacyTables) {
         'github_url',
         'is_suspended',
         'suspended_until',
+        'banned_until',
+        'token_version',
         'suspended_reason',
         'created_at'
       ],
@@ -457,6 +479,8 @@ async function copyLegacyData(legacyTables) {
         columnExpr(columns, 'github_url', 'NULL'),
         coalesceColumnExpr(columns, 'is_suspended', '0'),
         columnExpr(columns, 'suspended_until', 'NULL'),
+        columnExpr(columns, 'banned_until', columnExpr(columns, 'suspended_until', 'NULL')),
+        coalesceColumnExpr(columns, 'token_version', '0'),
         columnExpr(columns, 'suspended_reason', 'NULL'),
         columnExpr(columns, 'created_at', 'CURRENT_TIMESTAMP')
       ]

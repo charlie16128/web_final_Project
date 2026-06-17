@@ -293,7 +293,10 @@ async function submitActionModal(payload) {
     if (actionModal.type === 'ban-report') {
       await api.patch(`/admin/reports/${target.id}/ban`, {
         reason: payload.message,
-        ban_days: payload.ban_days
+        days: payload.days,
+        hours: payload.hours,
+        minutes: payload.minutes,
+        seconds: payload.seconds
       })
       reports.value = reports.value.filter((item) => item.id !== target.id)
       await loadUsers()
@@ -308,7 +311,10 @@ async function submitActionModal(payload) {
     if (actionModal.type === 'ban-user') {
       const response = await api.post(`/admin/users/${target.student_id}/ban`, {
         reason: payload.message,
-        ban_days: payload.ban_days
+        days: payload.days,
+        hours: payload.hours,
+        minutes: payload.minutes,
+        seconds: payload.seconds
       })
       Object.assign(target, response.data.user)
       showToast('已停權會員')

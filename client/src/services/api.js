@@ -18,9 +18,26 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const message = error.response?.data?.message || ''
+    const shouldLogout = (
+      error.response?.status === 401 ||
+      (
+        error.response?.status === 403 &&
+        (
+          message.includes('封鎖') ||
+          message.includes('停權') ||
+          message.includes('登入狀態已失效') ||
+          message.includes('登入已失效')
+        )
+      )
+    )
+
+    if (shouldLogout) {
       localStorage.removeItem('teamup_token')
       localStorage.removeItem('teamup_user')
+      if (window.location.pathname !== '/login') {
+        window.location.assign('/login')
+      }
     }
 
     return Promise.reject(error)

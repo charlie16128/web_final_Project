@@ -11,22 +11,21 @@ function readClient(filePath) {
   return fs.readFileSync(clientPath(filePath), 'utf8');
 }
 
-test('group detail places announcement and deadline summaries above discussion', function() {
+test('group detail places announcement summary above discussion', function() {
   var groupView = readClient('src/views/GroupView.vue');
   var announcementIndex = groupView.indexOf('class="summary-strip announcement-summary"');
-  var deadlineIndex = groupView.indexOf('class="summary-strip deadline-summary"');
   var discussionIndex = groupView.indexOf('class="panel discussion-panel"');
 
   assert.ok(announcementIndex >= 0);
-  assert.ok(deadlineIndex > announcementIndex);
-  assert.ok(discussionIndex > deadlineIndex);
+  assert.ok(discussionIndex > announcementIndex);
   assert.match(groupView, /announcementModalOpen/);
-  assert.match(groupView, /deadlineModalOpen/);
   assert.match(groupView, /\/announcements/);
-  assert.match(groupView, /\/deadlines/);
+  assert.doesNotMatch(groupView, /deadline-summary/);
+  assert.doesNotMatch(groupView, /deadlineModalOpen/);
+  assert.doesNotMatch(groupView, /\/deadlines/);
 });
 
-test('announcement and deadline summaries stay single-line and modal content can scroll', function() {
+test('announcement summary stays single-line and modal content can scroll', function() {
   var style = readClient('src/assets/style.css');
 
   assert.match(style, /\.summary-strip/);

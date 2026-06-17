@@ -12,10 +12,25 @@
       </label>
       <small v-if="error" class="modal-error">{{ error }}</small>
 
-      <label v-if="showBanDays">
-        停權天數
-        <input v-model.trim="banDays" type="number" min="1" max="365" placeholder="留空代表永久停權">
-      </label>
+      <div v-if="showBanDays" class="ban-duration-grid">
+        <label>
+          天
+          <input v-model.number="banDuration.days" type="number" min="0" max="365" placeholder="0">
+        </label>
+        <label>
+          小時
+          <input v-model.number="banDuration.hours" type="number" min="0" max="23" placeholder="0">
+        </label>
+        <label>
+          分鐘
+          <input v-model.number="banDuration.minutes" type="number" min="0" max="59" placeholder="0">
+        </label>
+        <label>
+          秒
+          <input v-model.number="banDuration.seconds" type="number" min="0" max="59" placeholder="0">
+        </label>
+        <small class="modal-hint">至少輸入一個大於 0 的時間欄位。</small>
+      </div>
 
       <div class="form-actions">
         <button class="ghost" type="button" @click="$emit('close')">取消</button>
@@ -57,14 +72,24 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'submit'])
 const message = ref('')
-const banDays = ref('')
+const banDuration = ref({
+  days: 0,
+  hours: 0,
+  minutes: 0,
+  seconds: 0
+})
 const error = ref('')
 
 watch(
   () => props.title,
   () => {
     message.value = ''
-    banDays.value = ''
+    banDuration.value = {
+      days: 0,
+      hours: 0,
+      minutes: 0,
+      seconds: 0
+    }
     error.value = ''
   }
 )
@@ -77,7 +102,10 @@ function submit() {
 
   emit('submit', {
     message: message.value.trim(),
-    ban_days: banDays.value ? Number(banDays.value) : null
+    days: Number(banDuration.value.days || 0),
+    hours: Number(banDuration.value.hours || 0),
+    minutes: Number(banDuration.value.minutes || 0),
+    seconds: Number(banDuration.value.seconds || 0)
   })
 }
 </script>

@@ -1230,6 +1230,27 @@ button.danger:hover {
   font-weight: 800;
 }
 
+.ban-duration-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.ban-duration-grid label {
+  min-width: 0;
+}
+
+.ban-duration-grid input {
+  min-width: 0;
+}
+
+.modal-hint {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  grid-column: 1 / -1;
+}
+
 .admin-report-item,
 .admin-user-row {
   border: 1px solid var(--line);

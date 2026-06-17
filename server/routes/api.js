@@ -54,6 +54,8 @@ function publicUser(row) {
     github_url: row.github_url || '',
     is_suspended: row.is_suspended || 0,
     suspended_until: row.suspended_until || null,
+    banned_until: row.banned_until || row.suspended_until || null,
+    token_version: Number(row.token_version || 0),
     suspended_reason: row.suspended_reason || '',
     created_at: row.created_at
   };
@@ -97,17 +99,68 @@ function isActiveSuspension(user) {
   if (!user || !user.is_suspended) {
     return false;
   }
-  if (!user.suspended_until) {
+  var until = user.banned_until || user.suspended_until;
+  if (!until) {
     return true;
   }
-  return new Date(user.suspended_until).getTime() > Date.now();
+  return new Date(until).getTime() > Date.now();
 }
 
 function suspensionMessage(user) {
-  if (!user.suspended_until) {
+  var until = user.banned_until || user.suspended_until;
+  if (!until) {
     return '帳號已被永久停權' + (user.suspended_reason ? '：' + user.suspended_reason : '');
   }
-  return '帳號停權至 ' + user.suspended_until + (user.suspended_reason ? '：' + user.suspended_reason : '');
+  return '帳號停權至 ' + until + (user.suspended_reason ? '：' + user.suspended_reason : '');
+}
+
+function hasGranularBanDuration(body) {
+  return ['days', 'hours', 'minutes', 'seconds'].some(function(key) {
+    return body[key] !== undefined && body[key] !== null && body[key] !== '';
+  });
+}
+
+function integerFromBody(body, key) {
+  if (body[key] === undefined || body[key] === null || body[key] === '') {
+    return 0;
+  }
+  return Number(body[key]);
+}
+
+function validateBanDuration(body) {
+  if (!hasGranularBanDuration(body)) {
+    return validateBanDays(body.ban_days);
+  }
+
+  var days = integerFromBody(body, 'days');
+  var hours = integerFromBody(body, 'hours');
+  var minutes = integerFromBody(body, 'minutes');
+  var seconds = integerFromBody(body, 'seconds');
+  if (![days, hours, minutes, seconds].every(Number.isInteger)) {
+    return false;
+  }
+  return (
+    days >= 0 && days <= 365 &&
+    hours >= 0 && hours <= 23 &&
+    minutes >= 0 && minutes <= 59 &&
+    seconds >= 0 && seconds <= 59 &&
+    days + hours + minutes + seconds > 0
+  );
+}
+
+function bannedUntilFromDuration(body) {
+  if (!hasGranularBanDuration(body)) {
+    return bannedUntilFromDays(body.ban_days);
+  }
+
+  var totalMs =
+    integerFromBody(body, 'days') * 24 * 60 * 60 * 1000 +
+    integerFromBody(body, 'hours') * 60 * 60 * 1000 +
+    integerFromBody(body, 'minutes') * 60 * 1000 +
+    integerFromBody(body, 'seconds') * 1000;
+  var until = new Date();
+  until = new Date(until.getTime() + totalMs);
+  return until.toISOString();
 }
 
 function bannedUntilFromDays(days) {
@@ -126,6 +179,18 @@ function validateBanDays(days) {
   }
   var value = Number(days);
   return Number.isInteger(value) && value >= 1 && value <= 365;
+}
+
+function banDaysForAudit(body) {
+  if (!hasGranularBanDuration(body)) {
+    return body.ban_days === null || body.ban_days === undefined || body.ban_days === '' ? null : Number(body.ban_days);
+  }
+  var totalDays =
+    integerFromBody(body, 'days') +
+    integerFromBody(body, 'hours') / 24 +
+    integerFromBody(body, 'minutes') / 1440 +
+    integerFromBody(body, 'seconds') / 86400;
+  return Math.max(1, Math.ceil(totalDays));
 }
 
 function isProjectAtCapacity(project) {
@@ -297,18 +362,23 @@ router.post('/login', asyncHandler(async function(req, res) {
     return;
   }
 
-  if (user.is_suspended && user.suspended_until && new Date(user.suspended_until).getTime() <= Date.now()) {
+  var suspendedUntil = user.banned_until || user.suspended_until;
+  if (user.is_suspended && suspendedUntil && new Date(suspendedUntil).getTime() <= Date.now()) {
     await db.run(
-      'UPDATE users SET is_suspended = 0, suspended_until = NULL, suspended_reason = NULL WHERE student_id = ?',
+      'UPDATE users SET is_suspended = 0, suspended_until = NULL, banned_until = NULL, suspended_reason = NULL WHERE student_id = ?',
       [user.student_id]
     );
     user.is_suspended = 0;
     user.suspended_until = null;
+    user.banned_until = null;
     user.suspended_reason = null;
   }
 
   if (isActiveSuspension(user)) {
-    res.status(403).json({ message: suspensionMessage(user) });
+    res.status(403).json({
+      message: suspensionMessage(user),
+      banned_until: user.banned_until || user.suspended_until || null
+    });
     return;
   }
 
@@ -550,8 +620,8 @@ router.patch('/admin/reports/:id/ban', asyncHandler(async function(req, res) {
     res.status(400).json({ message: '請輸入停權對象與原因' });
     return;
   }
-  if (!validateBanDays(req.body.ban_days)) {
-    res.status(400).json({ message: '停權天數必須介於 1 到 365 天，或留空代表永久停權' });
+  if (!validateBanDuration(req.body)) {
+    res.status(400).json({ message: '停權時間不可為負數，時分秒需在有效範圍，且不可全部為 0' });
     return;
   }
 
@@ -565,14 +635,14 @@ router.patch('/admin/reports/:id/ban', asyncHandler(async function(req, res) {
     return;
   }
 
-  var bannedUntil = bannedUntilFromDays(req.body.ban_days);
+  var bannedUntil = bannedUntilFromDuration(req.body);
   var action = bannedUntil ? 'temporary_ban' : 'permanent_ban';
-  var banDays = bannedUntil ? Number(req.body.ban_days) : null;
+  var banDays = bannedUntil ? banDaysForAudit(req.body) : null;
   var reason = String(req.body.reason).trim();
 
   await db.run(
-    'UPDATE users SET is_suspended = 1, suspended_until = ?, suspended_reason = ? WHERE student_id = ?',
-    [bannedUntil, reason, targetUser.student_id]
+    'UPDATE users SET is_suspended = 1, suspended_until = ?, banned_until = ?, suspended_reason = ?, token_version = COALESCE(token_version, 0) + 1 WHERE student_id = ?',
+    [bannedUntil, bannedUntil, reason, targetUser.student_id]
   );
   await db.run(
     'INSERT INTO punishments (user_id, admin_id, type, message, ban_days, banned_until) VALUES (?, ?, ?, ?, ?, ?)',
@@ -597,7 +667,7 @@ router.get('/admin/users', asyncHandler(async function(req, res) {
   }
 
   var users = await db.all(
-    'SELECT student_id, username, name, email, role, is_suspended, suspended_until, suspended_reason, created_at ' +
+    'SELECT student_id, username, name, email, role, is_suspended, suspended_until, banned_until, suspended_reason, token_version, created_at ' +
       'FROM users ' + where + 'ORDER BY role DESC, created_at DESC',
     params
   );
@@ -662,19 +732,19 @@ router.post('/admin/users/:student_id/ban', asyncHandler(async function(req, res
     res.status(400).json({ message: '不能停權 super_admin' });
     return;
   }
-  if (!required(req.body.reason) || !validateBanDays(req.body.ban_days)) {
-    res.status(400).json({ message: '請輸入停權原因，天數需介於 1 到 365 天或留空代表永久停權' });
+  if (!required(req.body.reason) || !validateBanDuration(req.body)) {
+    res.status(400).json({ message: '請輸入停權原因；停權時間不可為負數，時分秒需在有效範圍，且不可全部為 0' });
     return;
   }
 
-  var bannedUntil = bannedUntilFromDays(req.body.ban_days);
+  var bannedUntil = bannedUntilFromDuration(req.body);
   var action = bannedUntil ? 'temporary_ban' : 'permanent_ban';
-  var banDays = bannedUntil ? Number(req.body.ban_days) : null;
+  var banDays = bannedUntil ? banDaysForAudit(req.body) : null;
   var reason = String(req.body.reason).trim();
 
   await db.run(
-    'UPDATE users SET is_suspended = 1, suspended_until = ?, suspended_reason = ? WHERE student_id = ?',
-    [bannedUntil, reason, targetUser.student_id]
+    'UPDATE users SET is_suspended = 1, suspended_until = ?, banned_until = ?, suspended_reason = ?, token_version = COALESCE(token_version, 0) + 1 WHERE student_id = ?',
+    [bannedUntil, bannedUntil, reason, targetUser.student_id]
   );
   await db.run(
     'INSERT INTO punishments (user_id, admin_id, type, message, ban_days, banned_until) VALUES (?, ?, ?, ?, ?, ?)',
@@ -695,7 +765,7 @@ router.post('/admin/users/:student_id/unban', asyncHandler(async function(req, r
   }
 
   await db.run(
-    'UPDATE users SET is_suspended = 0, suspended_until = NULL, suspended_reason = NULL WHERE student_id = ?',
+    'UPDATE users SET is_suspended = 0, suspended_until = NULL, banned_until = NULL, suspended_reason = NULL, token_version = COALESCE(token_version, 0) + 1 WHERE student_id = ?',
     [targetUser.student_id]
   );
   await db.run(
@@ -1272,6 +1342,124 @@ router.delete('/groups/:id/announcements/:announcementId', auth.authRequired, as
   res.json({ message: '公告已刪除' });
 }));
 
+function normalizedTargetTime(value) {
+  if (!required(value)) {
+    return null;
+  }
+  var date = new Date(String(value).trim());
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  return date.toISOString();
+}
+
+function canManageCountdown(project, countdown, userId) {
+  return (
+    countdown.created_by === userId ||
+    canManageGroup(project.group_role) ||
+    project.relation === 'admin'
+  );
+}
+
+router.get('/groups/:id/countdowns', auth.authRequired, asyncHandler(async function(req, res) {
+  var project = await groupMemberForUser(req.params.id, req.user.student_id);
+  if (!project) {
+    res.status(404).json({ message: '找不到可存取的群組' });
+    return;
+  }
+
+  var countdowns = await db.all(
+    'SELECT group_countdowns.*, users.name AS creator_name, users.role AS creator_role ' +
+      'FROM group_countdowns LEFT JOIN users ON users.student_id = group_countdowns.created_by ' +
+      'WHERE group_countdowns.group_id = ? ORDER BY group_countdowns.target_time ASC, group_countdowns.created_at ASC',
+    [req.params.id]
+  );
+  res.json({ countdowns: countdowns });
+}));
+
+router.post('/groups/:id/countdowns', auth.authRequired, asyncHandler(async function(req, res) {
+  var project = await groupMemberForUser(req.params.id, req.user.student_id);
+  if (!project) {
+    res.status(404).json({ message: '找不到可存取的群組' });
+    return;
+  }
+
+  var targetTime = normalizedTargetTime(req.body.target_time);
+  if (!required(req.body.title) || !targetTime) {
+    res.status(400).json({ message: '倒數標題與有效目標時間為必填' });
+    return;
+  }
+
+  var result = await db.run(
+    'INSERT INTO group_countdowns (group_id, title, description, target_time, created_by) VALUES (?, ?, ?, ?, ?)',
+    [
+      req.params.id,
+      String(req.body.title).trim(),
+      req.body.description ? String(req.body.description).trim() : '',
+      targetTime,
+      req.user.student_id
+    ]
+  );
+  res.status(201).json({ countdown: await countdownById(result.id) });
+}));
+
+router.patch('/groups/:id/countdowns/:countdownId', auth.authRequired, asyncHandler(async function(req, res) {
+  var project = await groupMemberForUser(req.params.id, req.user.student_id);
+  if (!project) {
+    res.status(404).json({ message: '找不到可存取的群組' });
+    return;
+  }
+
+  var countdown = await countdownById(req.params.countdownId);
+  if (!countdown || String(countdown.group_id) !== String(req.params.id)) {
+    res.status(404).json({ message: '找不到倒數' });
+    return;
+  }
+  if (!canManageCountdown(project, countdown, req.user.student_id)) {
+    res.status(403).json({ message: '只有建立者、隊長或副隊長可以編輯倒數' });
+    return;
+  }
+
+  var targetTime = normalizedTargetTime(req.body.target_time);
+  if (!required(req.body.title) || !targetTime) {
+    res.status(400).json({ message: '倒數標題與有效目標時間為必填' });
+    return;
+  }
+
+  await db.run(
+    'UPDATE group_countdowns SET title = ?, description = ?, target_time = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND group_id = ?',
+    [
+      String(req.body.title).trim(),
+      req.body.description ? String(req.body.description).trim() : '',
+      targetTime,
+      req.params.countdownId,
+      req.params.id
+    ]
+  );
+  res.json({ countdown: await countdownById(req.params.countdownId) });
+}));
+
+router.delete('/groups/:id/countdowns/:countdownId', auth.authRequired, asyncHandler(async function(req, res) {
+  var project = await groupMemberForUser(req.params.id, req.user.student_id);
+  if (!project) {
+    res.status(404).json({ message: '找不到可存取的群組' });
+    return;
+  }
+
+  var countdown = await countdownById(req.params.countdownId);
+  if (!countdown || String(countdown.group_id) !== String(req.params.id)) {
+    res.status(404).json({ message: '找不到倒數' });
+    return;
+  }
+  if (!canManageCountdown(project, countdown, req.user.student_id)) {
+    res.status(403).json({ message: '只有建立者、隊長或副隊長可以刪除倒數' });
+    return;
+  }
+
+  await db.run('DELETE FROM group_countdowns WHERE id = ? AND group_id = ?', [req.params.countdownId, req.params.id]);
+  res.json({ message: '倒數已刪除' });
+}));
+
 router.get('/groups/:id/deadlines', auth.authRequired, asyncHandler(async function(req, res) {
   var project = await groupOrAdminForUser(req.params.id, req.user.student_id);
   if (!project) {
@@ -1690,6 +1878,15 @@ function announcementById(id) {
 
 function deadlineById(id) {
   return db.get('SELECT * FROM project_deadlines WHERE id = ?', [id]);
+}
+
+function countdownById(id) {
+  return db.get(
+    'SELECT group_countdowns.*, users.name AS creator_name, users.role AS creator_role ' +
+      'FROM group_countdowns LEFT JOIN users ON users.student_id = group_countdowns.created_by ' +
+      'WHERE group_countdowns.id = ?',
+    [id]
+  );
 }
 
 function reportSelectSql(suffix) {

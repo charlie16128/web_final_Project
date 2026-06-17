@@ -211,20 +211,18 @@
     </div>
 
     <div v-if="canUseDiscussion" class="group-main">
+      <CountdownBar
+        :countdowns="countdowns"
+        @add="openCreateCountdown"
+        @open="openCountdownDetails"
+      />
+
       <button
         class="summary-strip announcement-summary"
         type="button"
         @click="announcementModalOpen = true"
       >
         {{ announcementSummary }}
-      </button>
-
-      <button
-        class="summary-strip deadline-summary"
-        type="button"
-        @click="deadlineModalOpen = true"
-      >
-        {{ deadlineSummary }}
       </button>
 
       <section class="panel discussion-panel">
@@ -266,6 +264,18 @@
     @submit="submitCommentReport"
   />
 
+  <CountdownModal
+    v-if="countdownModalOpen"
+    :mode="countdownModalMode"
+    :countdown="selectedCountdown"
+    :current-user-id="currentUserId"
+    :can-manage="canManageGroupDetails"
+    @close="closeCountdownModal"
+    @create="createCountdown"
+    @update="updateCountdown"
+    @delete="deleteCountdown"
+  />
+
   <div v-if="announcementModalOpen" class="floating-modal-backdrop" @click.self="announcementModalOpen = false">
     <section class="floating-modal">
       <div class="modal-head">
@@ -295,51 +305,6 @@
           <div v-if="canManageGroupDetails" class="inline-actions">
             <button class="ghost compact-action" type="button" @click="editAnnouncement(announcement)">編輯</button>
             <button class="ghost danger compact-action" type="button" @click="deleteAnnouncement(announcement)">刪除</button>
-          </div>
-        </article>
-      </div>
-    </section>
-  </div>
-
-  <div v-if="deadlineModalOpen" class="floating-modal-backdrop" @click.self="deadlineModalOpen = false">
-    <section class="floating-modal">
-      <div class="modal-head">
-        <h2>倒數日期</h2>
-        <button class="modal-close ghost" type="button" @click="deadlineModalOpen = false">x</button>
-      </div>
-
-      <form v-if="canManageGroupDetails" class="stack" @submit.prevent="saveDeadline">
-        <div class="grid-form compact-fields">
-          <label data-required data-error="*請輸入倒數日期標題">
-            標題
-            <input v-model.trim="deadlineForm.title">
-          </label>
-          <label data-required data-error="*請選擇日期">
-            日期
-            <input v-model="deadlineForm.deadline_date" type="date">
-          </label>
-        </div>
-        <label>
-          說明
-          <textarea v-model.trim="deadlineForm.description" rows="3" placeholder="補充說明"></textarea>
-        </label>
-        <div class="form-actions">
-          <button type="submit">{{ deadlineForm.id ? '更新倒數日期' : '新增倒數日期' }}</button>
-          <button v-if="deadlineForm.id" class="ghost" type="button" @click="resetDeadlineForm">取消編輯</button>
-        </div>
-      </form>
-
-      <div class="modal-list">
-        <article v-if="!deadlines.length" class="mini-item">目前沒有倒數日期</article>
-        <article v-for="deadline in deadlines" :key="deadline.id" class="modal-item">
-          <div class="deadline-row">
-            <strong>{{ deadline.title }}</strong>
-            <span>{{ deadline.deadline_date }} ｜ {{ daysRemainingText(deadline.deadline_date) }}</span>
-          </div>
-          <p v-if="deadline.description">{{ deadline.description }}</p>
-          <div v-if="canManageGroupDetails" class="inline-actions">
-            <button class="ghost compact-action" type="button" @click="editDeadline(deadline)">編輯</button>
-            <button class="ghost danger compact-action" type="button" @click="deleteDeadline(deadline)">刪除</button>
           </div>
         </article>
       </div>
@@ -402,6 +367,8 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '../services/api'
 import AppHeader from '../components/AppHeader.vue'
+import CountdownBar from '../components/CountdownBar.vue'
+import CountdownModal from '../components/CountdownModal.vue'
 import CustomSelect from '../components/common/CustomSelect.vue'
 import DisplayName from '../components/DisplayName.vue'
 import FloatingInputModal from '../components/FloatingInputModal.vue'
@@ -417,10 +384,12 @@ const members = ref([])
 const comments = ref([])
 const commentContent = ref('')
 const commentSignature = ref('')
+const countdowns = ref([])
+const countdownModalOpen = ref(false)
+const countdownModalMode = ref('view')
+const selectedCountdown = ref(null)
 const announcements = ref([])
-const deadlines = ref([])
 const announcementModalOpen = ref(false)
-const deadlineModalOpen = ref(false)
 const inviteModalOpen = ref(false)
 const transferModalOpen = ref(false)
 const reportCommentTarget = ref(null)
@@ -441,13 +410,6 @@ const editForm = reactive({
 const announcementForm = reactive({
   id: null,
   content: ''
-})
-
-const deadlineForm = reactive({
-  id: null,
-  title: '',
-  deadline_date: '',
-  description: ''
 })
 
 const inviteForm = reactive({
@@ -500,6 +462,10 @@ const canDeleteGroup = computed(() => (
   Boolean(group.value?.can_delete_group)
 ))
 
+const currentUserId = computed(() => (
+  user.value?.id || user.value?.student_id || ''
+))
+
 const isGroupFull = computed(() => (
   Number(group.value?.current_members || 0) >= Number(group.value?.max_members || 0)
 ))
@@ -520,14 +486,6 @@ const announcementSummary = computed(() => {
     return '目前沒有公告'
   }
   return `公告：${announcements.value[0].content}`
-})
-
-const deadlineSummary = computed(() => {
-  if (!deadlines.value.length) {
-    return '目前沒有倒數日期'
-  }
-  const deadline = deadlines.value[0]
-  return `${deadline.title}：${daysRemainingText(deadline.deadline_date)}`
 })
 
 const membershipActionText = computed(() => {
@@ -619,10 +577,10 @@ async function loadGroup() {
   }
 
   if (canUseDiscussion.value) {
-    await Promise.all([loadAnnouncements(), loadDeadlines()])
+    await Promise.all([loadCountdowns(), loadAnnouncements()])
   } else {
+    countdowns.value = []
     announcements.value = []
-    deadlines.value = []
     comments.value = []
     commentSignature.value = ''
     stopPolling()
@@ -654,9 +612,9 @@ async function loadAnnouncements() {
   announcements.value = response.data.announcements || []
 }
 
-async function loadDeadlines() {
-  const response = await api.get(`/groups/${route.params.id}/deadlines`)
-  deadlines.value = response.data.deadlines || []
+async function loadCountdowns() {
+  const response = await api.get(`/groups/${route.params.id}/countdowns`)
+  countdowns.value = response.data.countdowns || []
 }
 
 async function loadComments(silent = false) {
@@ -759,6 +717,61 @@ async function inviteMember() {
     await loadGroup()
   } catch (error) {
     showToast(error.response?.data?.message || '送出邀請失敗')
+  }
+}
+
+function openCreateCountdown() {
+  selectedCountdown.value = null
+  countdownModalMode.value = 'create'
+  countdownModalOpen.value = true
+}
+
+function openCountdownDetails(countdown) {
+  selectedCountdown.value = countdown
+  countdownModalMode.value = 'view'
+  countdownModalOpen.value = true
+}
+
+function closeCountdownModal() {
+  countdownModalOpen.value = false
+  selectedCountdown.value = null
+  countdownModalMode.value = 'view'
+}
+
+async function createCountdown(payload) {
+  try {
+    await api.post(`/groups/${route.params.id}/countdowns`, payload)
+    showToast('倒數已新增')
+    closeCountdownModal()
+    await loadCountdowns()
+  } catch (error) {
+    showToast(error.response?.data?.message || '新增倒數失敗')
+  }
+}
+
+async function updateCountdown(countdown, payload) {
+  try {
+    await api.patch(`/groups/${route.params.id}/countdowns/${countdown.id}`, payload)
+    showToast('倒數已更新')
+    closeCountdownModal()
+    await loadCountdowns()
+  } catch (error) {
+    showToast(error.response?.data?.message || '更新倒數失敗')
+  }
+}
+
+async function deleteCountdown(countdown) {
+  if (!window.confirm('確定要刪除此倒數嗎？')) {
+    return
+  }
+
+  try {
+    await api.delete(`/groups/${route.params.id}/countdowns/${countdown.id}`)
+    showToast('倒數已刪除')
+    closeCountdownModal()
+    await loadCountdowns()
+  } catch (error) {
+    showToast(error.response?.data?.message || '刪除倒數失敗')
   }
 }
 
@@ -898,64 +911,6 @@ async function deleteAnnouncement(announcement) {
   }
 }
 
-async function saveDeadline() {
-  if (!deadlineForm.title || !deadlineForm.deadline_date) {
-    showToast('請輸入倒數日期標題與日期')
-    return
-  }
-
-  const payload = {
-    title: deadlineForm.title,
-    deadline_date: deadlineForm.deadline_date,
-    description: deadlineForm.description
-  }
-
-  try {
-    if (deadlineForm.id) {
-      await api.put(`/groups/${route.params.id}/deadlines/${deadlineForm.id}`, payload)
-      showToast('倒數日期已更新')
-    } else {
-      await api.post(`/groups/${route.params.id}/deadlines`, payload)
-      showToast('倒數日期已新增')
-    }
-    resetDeadlineForm()
-    await loadDeadlines()
-  } catch (error) {
-    showToast(error.response?.data?.message || '倒數日期儲存失敗')
-  }
-}
-
-function editDeadline(deadline) {
-  deadlineForm.id = deadline.id
-  deadlineForm.title = deadline.title
-  deadlineForm.deadline_date = deadline.deadline_date
-  deadlineForm.description = deadline.description || ''
-}
-
-function resetDeadlineForm() {
-  deadlineForm.id = null
-  deadlineForm.title = ''
-  deadlineForm.deadline_date = ''
-  deadlineForm.description = ''
-}
-
-async function deleteDeadline(deadline) {
-  if (!window.confirm('確定要刪除這個倒數日期嗎？')) {
-    return
-  }
-
-  try {
-    await api.delete(`/groups/${route.params.id}/deadlines/${deadline.id}`)
-    if (deadlineForm.id === deadline.id) {
-      resetDeadlineForm()
-    }
-    showToast('倒數日期已刪除')
-    await loadDeadlines()
-  } catch (error) {
-    showToast(error.response?.data?.message || '倒數日期刪除失敗')
-  }
-}
-
 async function handleMembershipAction() {
   if (!group.value) {
     return
@@ -1050,29 +1005,6 @@ async function submitCommentReport(payload) {
   } catch (error) {
     showToast(error.response?.data?.message || '檢舉送出失敗')
   }
-}
-
-function daysRemainingText(value) {
-  if (!value) {
-    return ''
-  }
-
-  const deadlineDate = new Date(`${value}T00:00:00`)
-  if (Number.isNaN(deadlineDate.getTime())) {
-    return value
-  }
-
-  const now = new Date()
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const days = Math.ceil((deadlineDate - today) / 86400000)
-
-  if (days === 0) {
-    return '今天到期'
-  }
-  if (days > 0) {
-    return `剩 ${days} 天`
-  }
-  return `已逾期 ${Math.abs(days)} 天`
 }
 
 function formatTime(value) {
