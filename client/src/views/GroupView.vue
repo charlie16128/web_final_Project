@@ -1,7 +1,7 @@
 <template>
   <AppHeader :user="user" back-home @logout="logout" />
 
-  <main class="group-layout">
+  <main class="group-layout" :class="{ 'public-group-layout': !canUseDiscussion }">
     <div v-if="group" class="group-side">
       <section class="panel group-detail">
         <template v-if="!showEditForm">
@@ -141,13 +141,13 @@
         </div>
       </section>
 
-      <section v-if="canManageGroupDetails" class="panel team-management-panel">
+      <section v-if="group" class="panel team-management-panel">
         <div class="section-title">
-          <h2>隊伍管理</h2>
-          <p>管理所有隊員、邀請新成員或轉移隊長。</p>
+          <h2>{{ canManageGroupDetails ? '隊伍管理' : '成員列表' }}</h2>
+          <p>{{ canManageGroupDetails ? '管理所有隊員、邀請新成員或轉移隊長。' : '查看目前隊伍成員。' }}</p>
         </div>
 
-        <div class="team-management-actions team-management-grid">
+        <div v-if="canManageGroupDetails" class="team-management-actions team-management-grid">
           <button type="button" :disabled="isGroupFull" @click="inviteModalOpen = true">邀請成員</button>
           <button
             v-if="canTransferLeader"
@@ -166,7 +166,7 @@
             刪除隊伍
           </button>
         </div>
-        <p v-if="isGroupFull" class="mini-item">隊伍已額滿，無法再邀請新成員。</p>
+        <p v-if="canManageGroupDetails && isGroupFull" class="mini-item">隊伍已額滿，無法再邀請新成員。</p>
 
         <div class="invite-list">
           <div v-for="member in members" :key="member.id" class="mini-item member-row">
@@ -502,13 +502,16 @@ const relationLabel = computed(() => {
   if (group.value?.relation === 'owned') {
     return '我是隊長'
   }
+  if (group.value?.relation === 'joined') {
+    return '已加入'
+  }
   if (group.value?.relation === 'pending') {
     return '申請審核中'
   }
   if (group.value?.relation === 'admin') {
     return '管理員檢視'
   }
-  return '已加入'
+  return '尚未加入'
 })
 
 let pollingTimer = 0
@@ -569,11 +572,12 @@ async function loadGroup() {
   }
   fillEditForm(group.value)
 
+  await loadMembers()
+
   if (canManageGroupDetails.value) {
-    await Promise.all([loadApplications(), loadMembers()])
+    await loadApplications()
   } else {
     applications.value = []
-    members.value = []
   }
 
   if (canUseDiscussion.value) {
@@ -598,7 +602,7 @@ async function loadApplications() {
 }
 
 async function loadMembers() {
-  if (!group.value || !canManageGroupDetails.value) {
+  if (!group.value) {
     members.value = []
     return
   }

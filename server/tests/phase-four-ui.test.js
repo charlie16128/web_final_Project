@@ -30,18 +30,23 @@ test('group detail wires owner invitation and leader transfer controls', functio
   assert.match(groupView, /\/projects\/\$\{group\.value\.id\}\/transfer-owner/);
   assert.match(groupView, /isGroupFull/);
   assert.match(groupView, /:disabled="isGroupFull"/);
+  assert.match(groupView, /public-group-layout/);
+  assert.match(groupView, /成員列表/);
+  assert.match(groupView, /v-if="canManageGroupDetails" class="team-management-actions/);
 });
 
-test('home view lists pending invitations with accept and reject actions', function() {
-  var homeView = readClient('src/views/HomeView.vue');
+test('applications invitations view lists pending invitations with accept and reject actions', function() {
+  var applicationsInvitationsView = readClient('src/views/ApplicationsInvitationsView.vue');
+  var invitationsComposable = readClient('src/composables/useGroupsAndInvitations.js');
 
-  assert.match(homeView, /myInvitations/);
-  assert.match(homeView, /loadMyInvitations/);
-  assert.match(homeView, /\/me\/invitations/);
-  assert.match(homeView, /acceptInvitation/);
-  assert.match(homeView, /rejectInvitation/);
-  assert.match(homeView, /\/invitations\/\$\{invitation\.id\}\/accept/);
-  assert.match(homeView, /\/invitations\/\$\{invitation\.id\}\/reject/);
+  assert.match(applicationsInvitationsView, /myInvitations/);
+  assert.match(applicationsInvitationsView, /loadMyInvitations/);
+  assert.match(applicationsInvitationsView, /selectTab\('invitations'\)/);
+  assert.match(applicationsInvitationsView, /acceptInvitation/);
+  assert.match(applicationsInvitationsView, /rejectInvitation/);
+  assert.match(invitationsComposable, /\/me\/invitations/);
+  assert.match(invitationsComposable, /\/invitations\/\$\{invitation\.id\}\/accept/);
+  assert.match(invitationsComposable, /\/invitations\/\$\{invitation\.id\}\/reject/);
 });
 
 test('team management controls have responsive layout styles', function() {

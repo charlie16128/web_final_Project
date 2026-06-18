@@ -343,6 +343,72 @@ label {
   grid-column: 2;
 }
 
+.main-navbar {
+  align-items: center;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  gap: 28px;
+  justify-content: center;
+  padding: 14px 16px;
+}
+
+.main-navbar a {
+  color: var(--ink);
+  font-weight: 800;
+  position: relative;
+  text-decoration: none;
+  transform: none;
+}
+
+.main-navbar a:hover {
+  transform: none;
+}
+
+.main-navbar a::after {
+  background: var(--primary);
+  bottom: -6px;
+  content: "";
+  height: 2px;
+  left: 0;
+  position: absolute;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 180ms ease;
+  width: 100%;
+}
+
+.main-navbar a:hover::after,
+.main-navbar a.router-link-active::after {
+  transform: scaleX(1);
+}
+
+.page-shell {
+  margin: 0 auto;
+  padding: 24px 0 48px;
+  width: min(1100px, calc(100% - 32px));
+}
+
+.page-center-column,
+.project-page-column {
+  display: grid;
+  gap: 18px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.page-center-column {
+  max-width: 960px;
+}
+
+.project-page-column {
+  max-width: 1100px;
+}
+
+.page-center-column .sidebar {
+  grid-column: auto;
+}
+
 .project-form-panel {
   align-self: start;
 }
@@ -761,6 +827,15 @@ label {
   grid-column: 1;
   grid-row: 1;
   min-width: 0;
+}
+
+.public-group-layout {
+  grid-template-columns: minmax(0, 980px);
+  justify-content: center;
+}
+
+.public-group-layout .group-side {
+  grid-column: auto;
 }
 
 .summary-strip {
@@ -1213,6 +1288,32 @@ button.danger:hover {
   transform: translateX(calc(100% + 4px));
 }
 
+.application-tabs {
+  grid-template-columns: repeat(2, 1fr);
+  margin-bottom: 16px;
+}
+
+.application-tabs::before {
+  background: var(--tab-active);
+  border-radius: 15px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+  content: "";
+  inset: 4px auto 4px 4px;
+  position: absolute;
+  transform: translateX(0);
+  transition: transform 220ms ease;
+  width: calc((100% - 12px) / 2);
+}
+
+.application-tabs.tab-invitations::before {
+  transform: translateX(calc(100% + 4px));
+}
+
+.application-invitation-panel {
+  display: grid;
+  gap: 14px;
+}
+
 .admin-search {
   align-items: center;
   display: grid;
@@ -1348,5 +1449,19 @@ button.danger:hover {
 
   .auth-copy h1 {
     font-size: 40px;
+  }
+}
+
+@media (max-width: 760px) {
+  .main-navbar {
+    gap: 14px;
+    justify-content: flex-start;
+    overflow-x: auto;
+  }
+
+  .toolbar,
+  .application-row,
+  .applications-list .application-row {
+    grid-template-columns: 1fr;
   }
 }

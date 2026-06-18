@@ -171,7 +171,9 @@ test('pending applicants can open group details but not discussion, then leave a
     assert.equal(left.status, 200);
 
     var afterLeaveGroup = await request(ctx.app, 'GET', '/api/groups/' + project.id, null, applicant.token);
-    assert.equal(afterLeaveGroup.status, 404);
+    assert.equal(afterLeaveGroup.status, 200);
+    assert.equal(afterLeaveGroup.body.group.relation, 'public');
+    assert.equal(afterLeaveGroup.body.group.can_view_private_area, false);
 
     var publicProject = await request(ctx.app, 'GET', '/api/projects/' + project.id, null, applicant.token);
     assert.equal(publicProject.status, 200);
@@ -195,6 +197,17 @@ test('project comments API only allows group members to list and create comments
 
     var outsiderList = await request(ctx.app, 'GET', '/api/projects/' + project.id + '/comments', null, outsider.token);
     assert.equal(outsiderList.status, 404);
+
+    var outsiderGroup = await request(ctx.app, 'GET', '/api/groups/' + project.id, null, outsider.token);
+    assert.equal(outsiderGroup.status, 200);
+    assert.equal(outsiderGroup.body.group.relation, 'public');
+    assert.equal(outsiderGroup.body.group.can_view_private_area, false);
+
+    var outsiderMembers = await request(ctx.app, 'GET', '/api/groups/' + project.id + '/members', null, outsider.token);
+    assert.equal(outsiderMembers.status, 200);
+    assert.deepEqual(outsiderMembers.body.members.map(function(item) {
+      return item.group_role;
+    }), ['leader', 'member']);
 
     var outsiderCreated = await request(ctx.app, 'POST', '/api/projects/' + project.id + '/comments', {
       content: 'I should not see this group discussion'

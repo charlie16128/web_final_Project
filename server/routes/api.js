@@ -1104,10 +1104,19 @@ router.get('/groups/:id', auth.authRequired, asyncHandler(async function(req, re
   var user = await currentUser(req.user.student_id);
   var project = await groupOrAdminForUser(req.params.id, req.user.student_id);
   if (!project) {
-    res.status(404).json({ message: '找不到可存取的群組' });
+    project = await db.get(
+      'SELECT projects.*, users.name AS owner_name, users.role AS owner_role, "public" AS relation, NULL AS group_role ' +
+        'FROM projects JOIN users ON users.student_id = projects.owner_id WHERE projects.id = ?',
+      [req.params.id]
+    );
+  }
+  if (!project) {
+    res.status(404).json({ message: '找不到群組' });
     return;
   }
-  project.group_role = project.relation === 'admin' ? 'admin' : await getGroupRole(req.params.id, req.user.student_id);
+  project.group_role = project.relation === 'admin'
+    ? 'admin'
+    : (project.group_role || await getGroupRole(req.params.id, req.user.student_id));
   project.can_manage = canManageGroup(project.group_role) || isAdminRole(user);
   project.can_transfer_leader = project.group_role === 'leader' || isAdminRole(user);
   project.can_delete_group = project.group_role === 'leader' || isAdminRole(user);
@@ -1116,9 +1125,9 @@ router.get('/groups/:id', auth.authRequired, asyncHandler(async function(req, re
 }));
 
 router.get('/groups/:id/members', auth.authRequired, asyncHandler(async function(req, res) {
-  var project = await groupMemberForUser(req.params.id, req.user.student_id);
+  var project = await db.get('SELECT * FROM projects WHERE id = ?', [req.params.id]);
   if (!project) {
-    res.status(404).json({ message: '找不到可存取的群組' });
+    res.status(404).json({ message: '找不到群組' });
     return;
   }
 

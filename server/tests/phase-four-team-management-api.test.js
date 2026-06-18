@@ -166,7 +166,9 @@ test('project owners invite users and invitees accept or reject invitations', as
     assert.equal(rejected.body.invitation.status, 'rejected');
 
     var rejectedGroup = await request(ctx.app, 'GET', '/api/groups/' + project.id, null, rejectedInvitee.token);
-    assert.equal(rejectedGroup.status, 404);
+    assert.equal(rejectedGroup.status, 200);
+    assert.equal(rejectedGroup.body.group.relation, 'public');
+    assert.equal(rejectedGroup.body.group.can_view_private_area, false);
   } finally {
     await ctx.cleanup();
   }
@@ -282,7 +284,9 @@ test('project owners remove accepted members from team management', async functi
     assert.equal(removed.body.member_id, member.user.id);
 
     var removedGroup = await request(ctx.app, 'GET', '/api/groups/' + project.id, null, member.token);
-    assert.equal(removedGroup.status, 404);
+    assert.equal(removedGroup.status, 200);
+    assert.equal(removedGroup.body.group.relation, 'public');
+    assert.equal(removedGroup.body.group.can_view_private_area, false);
 
     var reopened = await request(ctx.app, 'GET', '/api/projects/' + project.id, null, outsider.token);
     assert.equal(reopened.status, 200);

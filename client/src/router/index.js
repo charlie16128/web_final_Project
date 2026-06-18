@@ -5,6 +5,8 @@ import LoginView from '../views/LoginView.vue'
 import RegisterView from '../views/RegisterView.vue'
 import GroupView from '../views/GroupView.vue'
 import AdminView from '../views/AdminView.vue'
+import MyGroupsView from '../views/MyGroupsView.vue'
+import ApplicationsInvitationsView from '../views/ApplicationsInvitationsView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -13,6 +15,18 @@ const router = createRouter({
       path: '/',
       name: 'home',
       component: HomeView,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/my-groups',
+      name: 'my-groups',
+      component: MyGroupsView,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/applications-invitations',
+      name: 'applications-invitations',
+      component: ApplicationsInvitationsView,
       meta: { requiresAuth: true }
     },
     {

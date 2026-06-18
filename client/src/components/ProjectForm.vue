@@ -31,8 +31,15 @@
 <script setup>
 import { reactive, ref } from 'vue'
 
+const props = defineProps({
+  defaultOpen: {
+    type: Boolean,
+    default: false
+  }
+})
+
 const emit = defineEmits(['create'])
-const open = ref(false)
+const open = ref(props.defaultOpen)
 
 const form = reactive(emptyProjectForm())
 
