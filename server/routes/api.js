@@ -869,6 +869,10 @@ async function createProjectInvitation(req, res) {
   }
 
   var inviteeId = String(req.body.user_id).trim();
+  if (!/^D[0-9]{7}$/.test(inviteeId)) {
+    res.status(400).json({ message: '學號格式必須為 D 加 7 位數字，例如 D1234567' });
+    return;
+  }
   if (inviteeId === req.user.student_id) {
     res.status(400).json({ message: '不能邀請自己' });
     return;
@@ -887,6 +891,18 @@ async function createProjectInvitation(req, res) {
   if (existingMember) {
     res.status(409).json({ message: '此使用者已是專題成員' });
     return;
+  }
+
+  var existingInvitation = await db.get(
+    'SELECT id, status FROM project_invitations WHERE project_id = ? AND invitee_id = ?',
+    [req.params.id, inviteeId]
+  );
+  if (existingInvitation) {
+    if (existingInvitation.status === 'pending') {
+      res.status(409).json({ message: '已經邀請過此使用者' });
+      return;
+    }
+    await db.run('DELETE FROM project_invitations WHERE id = ?', [existingInvitation.id]);
   }
 
   var result = await db.run(
@@ -971,10 +987,7 @@ router.post('/invitations/:id/accept', auth.authRequired, asyncHandler(async fun
     'UPDATE projects SET current_members = current_members + 1, status = CASE WHEN current_members + 1 >= max_members THEN "full" ELSE "open" END WHERE id = ?',
     [invitation.project_id]
   );
-  await db.run(
-    'UPDATE project_invitations SET status = "accepted", responded_at = CURRENT_TIMESTAMP WHERE id = ?',
-    [req.params.id]
-  );
+  await db.run('DELETE FROM project_invitations WHERE id = ?', [req.params.id]);
   await createNotification(
     invitation.inviter_id,
     'project_invitation_accepted',
@@ -983,7 +996,12 @@ router.post('/invitations/:id/accept', auth.authRequired, asyncHandler(async fun
     '/groups/' + invitation.project_id
   );
 
-  res.json({ invitation: await invitationById(req.params.id) });
+  res.json({
+    invitation: Object.assign({}, invitation, {
+      status: 'accepted',
+      responded_at: new Date().toISOString()
+    })
+  });
 }));
 
 router.post('/invitations/:id/reject', auth.authRequired, asyncHandler(async function(req, res) {
@@ -1139,8 +1157,12 @@ router.get('/groups/:id/members', auth.authRequired, asyncHandler(async function
       'SELECT users.student_id AS id, users.student_id, users.name, users.username, users.email, users.role, "joined" AS relation, COALESCE(applications.role, "member") AS group_role, applications.created_at AS joined_at ' +
       'FROM applications JOIN users ON users.student_id = applications.user_id ' +
       'WHERE applications.project_id = ? AND applications.status = "accepted" AND users.student_id != ? ' +
+      'UNION ALL ' +
+      'SELECT users.student_id AS id, users.student_id, users.name, users.username, users.email, users.role, "invited" AS relation, "invited" AS group_role, project_invitations.created_at AS joined_at ' +
+      'FROM project_invitations JOIN users ON users.student_id = project_invitations.invitee_id ' +
+      'WHERE project_invitations.project_id = ? AND project_invitations.status = "pending" ' +
       'ORDER BY relation DESC, joined_at ASC',
-    [req.params.id, req.params.id, project.owner_id]
+    [req.params.id, req.params.id, project.owner_id, req.params.id]
   );
   res.json({ members: members });
 }));
@@ -1241,7 +1263,7 @@ router.get('/groups/:id/comments', auth.authRequired, asyncHandler(async functio
   var comments = await db.all(
     'SELECT comments.*, users.name AS user_name, users.role AS user_role FROM comments ' +
       'JOIN users ON users.student_id = comments.user_id ' +
-      'WHERE project_id = ? ORDER BY comments.created_at ASC',
+      'WHERE project_id = ? ORDER BY comments.created_at DESC',
     [req.params.id]
   );
   res.json({ comments: comments });
@@ -1809,7 +1831,7 @@ router.get('/projects/:id/comments', auth.authRequired, asyncHandler(async funct
   }
 
   var comments = await db.all(
-    'SELECT comments.*, users.name AS user_name, users.role AS user_role FROM comments JOIN users ON users.student_id = comments.user_id WHERE project_id = ? ORDER BY comments.created_at ASC',
+    'SELECT comments.*, users.name AS user_name, users.role AS user_role FROM comments JOIN users ON users.student_id = comments.user_id WHERE project_id = ? ORDER BY comments.created_at DESC',
     [req.params.id]
   );
   res.json({ comments: comments });

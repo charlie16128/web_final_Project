@@ -30,9 +30,15 @@ test('group detail wires owner invitation and leader transfer controls', functio
   assert.match(groupView, /\/projects\/\$\{group\.value\.id\}\/transfer-owner/);
   assert.match(groupView, /isGroupFull/);
   assert.match(groupView, /:disabled="isGroupFull"/);
+  assert.match(groupView, /maxlength="8"/);
+  assert.match(groupView, /pattern="D\[0-9\]\{7\}"/);
+  assert.match(groupView, /normalizeInviteUserId/);
   assert.match(groupView, /public-group-layout/);
   assert.match(groupView, /成員列表/);
   assert.match(groupView, /v-if="canManageGroupDetails" class="team-management-actions/);
+  assert.match(groupView, /<AppDialog/);
+  assert.match(groupView, /requestConfirmation/);
+  assert.doesNotMatch(groupView, /window\.confirm/);
 });
 
 test('applications invitations view lists pending invitations with accept and reject actions', function() {

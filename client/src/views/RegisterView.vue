@@ -13,7 +13,6 @@
             姓名
             <input class="auth-input" v-model.trim="form.name" autofocus autocomplete="name">
           </label>
-          <p class="field-error">*請輸入姓名</p>
         </div>
         <div class="form-field">
           <label data-required data-error="*學號格式為 D 加 7 位數字">
@@ -27,14 +26,12 @@
               title="學號格式為 D 加 7 位數字，例如 D1234567"
             >
           </label>
-          <p class="field-error">*學號格式為 D 加 7 位數字</p>
         </div>
         <div class="form-field">
           <label data-required data-error="*請輸入電子郵件">
             Email
             <input class="auth-input" v-model.trim="form.email" type="email" autocomplete="email">
           </label>
-          <p class="field-error">*請輸入電子郵件</p>
         </div>
         <div class="form-field">
           <label data-required data-error="*密碼至少 6 碼，僅能使用英文或數字">
@@ -49,7 +46,6 @@
               autocomplete="new-password"
             >
           </label>
-          <p class="field-error">*密碼至少 6 碼，僅能使用英文或數字</p>
         </div>
         <button type="submit" :disabled="loading">{{ loading ? '註冊中...' : '註冊' }}</button>
       </form>

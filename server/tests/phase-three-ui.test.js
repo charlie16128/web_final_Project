@@ -11,28 +11,31 @@ function readClient(filePath) {
   return fs.readFileSync(clientPath(filePath), 'utf8');
 }
 
-test('group detail places announcement summary above discussion', function() {
+test('group detail places announcement bar above discussion', function() {
   var groupView = readClient('src/views/GroupView.vue');
-  var announcementIndex = groupView.indexOf('class="summary-strip announcement-summary"');
+  var announcementIndex = groupView.indexOf('<AnnouncementBar');
   var discussionIndex = groupView.indexOf('class="panel discussion-panel"');
 
   assert.ok(announcementIndex >= 0);
   assert.ok(discussionIndex > announcementIndex);
   assert.match(groupView, /announcementModalOpen/);
+  assert.match(groupView, /AnnouncementModal/);
   assert.match(groupView, /\/announcements/);
   assert.doesNotMatch(groupView, /deadline-summary/);
   assert.doesNotMatch(groupView, /deadlineModalOpen/);
   assert.doesNotMatch(groupView, /\/deadlines/);
 });
 
-test('announcement summary stays single-line and modal content can scroll', function() {
-  var style = readClient('src/assets/style.css');
+test('announcement bar uses countdown-style cards and modal content can scroll', function() {
+  var announcementBar = readClient('src/components/AnnouncementBar.vue');
+  var announcementModal = readClient('src/components/AnnouncementModal.vue');
 
-  assert.match(style, /\.summary-strip/);
-  assert.match(style, /white-space:\s*nowrap/);
-  assert.match(style, /text-overflow:\s*ellipsis/);
-  assert.match(style, /\.floating-modal-backdrop/);
-  assert.match(style, /\.floating-modal/);
-  assert.match(style, /max-height:\s*calc\(100vh - 40px\)/);
-  assert.match(style, /overflow-y:\s*auto/);
+  assert.match(announcementBar, /announcement-bar/);
+  assert.match(announcementBar, /announcement-card/);
+  assert.match(announcementBar, /countdown-scroll/);
+  assert.match(announcementBar, /white-space:\s*nowrap/);
+  assert.match(announcementBar, /text-overflow:\s*ellipsis/);
+  assert.match(announcementModal, /floating-modal-backdrop/);
+  assert.match(announcementModal, /announcement-modal/);
+  assert.match(announcementModal, /@click="\$emit\('delete', announcement\)"/);
 });

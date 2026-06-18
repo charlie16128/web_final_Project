@@ -2,7 +2,7 @@
   <AppHeader :user="user" back-home @logout="logout" />
 
   <main class="group-layout" :class="{ 'public-group-layout': !canUseDiscussion }">
-    <div v-if="group" class="group-side">
+    <div v-if="group" ref="groupSideEl" class="group-side">
       <section class="panel group-detail">
         <template v-if="!showEditForm">
           <div class="project-head">
@@ -217,15 +217,14 @@
         @open="openCountdownDetails"
       />
 
-      <button
-        class="summary-strip announcement-summary"
-        type="button"
-        @click="announcementModalOpen = true"
-      >
-        {{ announcementSummary }}
-      </button>
+      <AnnouncementBar
+        :announcements="announcements"
+        :can-manage="canManageGroupDetails"
+        @add="openCreateAnnouncement"
+        @open="openAnnouncementDetails"
+      />
 
-      <section class="panel discussion-panel">
+      <section ref="discussionPanelEl" class="panel discussion-panel" :style="discussionPanelStyle">
         <div class="section-title">
           <h2>隊伍討論</h2>
           <p>隊員可以在這裡留言與回覆。</p>
@@ -276,40 +275,16 @@
     @delete="deleteCountdown"
   />
 
-  <div v-if="announcementModalOpen" class="floating-modal-backdrop" @click.self="announcementModalOpen = false">
-    <section class="floating-modal">
-      <div class="modal-head">
-        <h2>公告</h2>
-        <button class="modal-close ghost" type="button" @click="announcementModalOpen = false">x</button>
-      </div>
-
-      <form v-if="canManageGroupDetails" class="stack" @submit.prevent="saveAnnouncement">
-        <label data-required data-error="*請輸入公告內容">
-          公告內容
-          <textarea v-model.trim="announcementForm.content" rows="4" placeholder="輸入公告內容"></textarea>
-        </label>
-        <div class="form-actions">
-          <button type="submit">{{ announcementForm.id ? '更新公告' : '新增公告' }}</button>
-          <button v-if="announcementForm.id" class="ghost" type="button" @click="resetAnnouncementForm">取消編輯</button>
-        </div>
-      </form>
-
-      <div class="modal-list">
-        <article v-if="!announcements.length" class="mini-item">目前沒有公告</article>
-        <article v-for="announcement in announcements" :key="announcement.id" class="modal-item">
-          <p>{{ announcement.content }}</p>
-          <small>
-            <DisplayName :name="announcement.author_name" :role="announcement.author_role" />
-            ｜ {{ formatTime(announcement.updated_at || announcement.created_at) }}
-          </small>
-          <div v-if="canManageGroupDetails" class="inline-actions">
-            <button class="ghost compact-action" type="button" @click="editAnnouncement(announcement)">編輯</button>
-            <button class="ghost danger compact-action" type="button" @click="deleteAnnouncement(announcement)">刪除</button>
-          </div>
-        </article>
-      </div>
-    </section>
-  </div>
+  <AnnouncementModal
+    v-if="announcementModalOpen"
+    :mode="announcementModalMode"
+    :announcement="selectedAnnouncement"
+    :can-manage="canManageGroupDetails"
+    @close="closeAnnouncementModal"
+    @create="createAnnouncement"
+    @update="updateAnnouncement"
+    @delete="deleteAnnouncement"
+  />
 
   <div v-if="inviteModalOpen" class="floating-modal-backdrop" @click.self="closeInviteModal">
     <section class="floating-modal team-management-modal">
@@ -321,7 +296,14 @@
       <form class="stack team-management-form invite-member-form" @submit.prevent="inviteMember">
         <label data-required data-error="*請輸入成員學號">
           成員學號
-          <input v-model.trim="inviteForm.user_id" :disabled="isGroupFull">
+          <input
+            v-model.trim="inviteForm.user_id"
+            :disabled="isGroupFull"
+            maxlength="8"
+            pattern="D[0-9]{7}"
+            placeholder="D1234567"
+            @input="normalizeInviteUserId"
+          >
         </label>
         <label>
           邀請訊息
@@ -359,13 +341,29 @@
     </section>
   </div>
 
+  <AppDialog
+    v-if="dialog.open"
+    :title="dialog.title"
+    :message="dialog.message"
+    :confirm-text="dialog.confirmText"
+    :cancel-text="dialog.cancelText"
+    :show-cancel="dialog.showCancel"
+    :danger="dialog.danger"
+    :confirm-class="dialog.confirmClass"
+    @confirm="confirmDialog"
+    @cancel="cancelDialog"
+  />
+
   <ToastMessage :message="toast" />
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '../services/api'
+import AnnouncementBar from '../components/AnnouncementBar.vue'
+import AnnouncementModal from '../components/AnnouncementModal.vue'
+import AppDialog from '../components/AppDialog.vue'
 import AppHeader from '../components/AppHeader.vue'
 import CountdownBar from '../components/CountdownBar.vue'
 import CountdownModal from '../components/CountdownModal.vue'
@@ -390,10 +388,15 @@ const countdownModalMode = ref('view')
 const selectedCountdown = ref(null)
 const announcements = ref([])
 const announcementModalOpen = ref(false)
+const announcementModalMode = ref('view')
+const selectedAnnouncement = ref(null)
 const inviteModalOpen = ref(false)
 const transferModalOpen = ref(false)
 const reportCommentTarget = ref(null)
 const toast = ref('')
+const groupSideEl = ref(null)
+const discussionPanelEl = ref(null)
+const discussionPanelMaxHeight = ref('')
 
 const editForm = reactive({
   title: '',
@@ -407,11 +410,6 @@ const editForm = reactive({
   description: ''
 })
 
-const announcementForm = reactive({
-  id: null,
-  content: ''
-})
-
 const inviteForm = reactive({
   user_id: '',
   message: ''
@@ -419,6 +417,18 @@ const inviteForm = reactive({
 
 const transferForm = reactive({
   user_id: ''
+})
+
+const dialog = reactive({
+  open: false,
+  title: '',
+  message: '',
+  confirmText: '確定',
+  cancelText: '取消',
+  showCancel: false,
+  danger: false,
+  confirmClass: '',
+  resolve: null
 })
 
 const groupStatusText = computed(() => {
@@ -481,13 +491,6 @@ const transferMemberOptions = computed(() => (
   }))
 ))
 
-const announcementSummary = computed(() => {
-  if (!announcements.value.length) {
-    return '目前沒有公告'
-  }
-  return `公告：${announcements.value[0].content}`
-})
-
 const membershipActionText = computed(() => {
   if (group.value?.relation === 'owned') {
     return '刪除隊伍'
@@ -516,6 +519,72 @@ const relationLabel = computed(() => {
 
 let pollingTimer = 0
 let toastTimer = 0
+let discussionResizeObserver = null
+let discussionLayoutFrame = 0
+
+const discussionPanelStyle = computed(() => (
+  discussionPanelMaxHeight.value
+    ? { '--discussion-panel-max-height': discussionPanelMaxHeight.value }
+    : {}
+))
+
+function updateDiscussionPanelHeight() {
+  if (
+    !canUseDiscussion.value ||
+    !groupSideEl.value ||
+    !discussionPanelEl.value ||
+    window.innerWidth <= 860
+  ) {
+    discussionPanelMaxHeight.value = ''
+    return
+  }
+
+  const sideRect = groupSideEl.value.getBoundingClientRect()
+  const panelRect = discussionPanelEl.value.getBoundingClientRect()
+  const sideLimit = Math.floor(sideRect.bottom - panelRect.top)
+  const viewportLimit = Math.floor(window.innerHeight - panelRect.top - 24)
+  const nextHeight = Math.min(sideLimit, viewportLimit)
+
+  discussionPanelMaxHeight.value = nextHeight >= 500 ? `${nextHeight}px` : ''
+}
+
+function scheduleDiscussionPanelHeightUpdate() {
+  if (discussionLayoutFrame) {
+    window.cancelAnimationFrame(discussionLayoutFrame)
+  }
+
+  discussionLayoutFrame = window.requestAnimationFrame(() => {
+    discussionLayoutFrame = 0
+    updateDiscussionPanelHeight()
+  })
+}
+
+function startDiscussionLayoutObserver() {
+  stopDiscussionLayoutObserver()
+
+  if (typeof ResizeObserver !== 'undefined' && groupSideEl.value) {
+    discussionResizeObserver = new ResizeObserver(scheduleDiscussionPanelHeightUpdate)
+    discussionResizeObserver.observe(groupSideEl.value)
+  }
+
+  window.addEventListener('resize', scheduleDiscussionPanelHeightUpdate)
+  scheduleDiscussionPanelHeightUpdate()
+}
+
+function stopDiscussionLayoutObserver() {
+  if (discussionResizeObserver) {
+    discussionResizeObserver.disconnect()
+    discussionResizeObserver = null
+  }
+
+  if (discussionLayoutFrame) {
+    window.cancelAnimationFrame(discussionLayoutFrame)
+    discussionLayoutFrame = 0
+  }
+
+  window.removeEventListener('resize', scheduleDiscussionPanelHeightUpdate)
+  discussionPanelMaxHeight.value = ''
+}
 
 function showToast(message) {
   toast.value = message
@@ -523,6 +592,55 @@ function showToast(message) {
   toastTimer = window.setTimeout(() => {
     toast.value = ''
   }, 2400)
+}
+
+function requestDialog(options) {
+  return new Promise((resolve) => {
+    Object.assign(dialog, {
+      open: true,
+      title: options.title || '訊息',
+      message: options.message,
+      confirmText: options.confirmText || '確定',
+      cancelText: options.cancelText || '取消',
+      showCancel: Boolean(options.showCancel),
+      danger: Boolean(options.danger),
+      confirmClass: options.confirmClass || '',
+      resolve
+    })
+  })
+}
+
+function requestConfirmation(options) {
+  return requestDialog({
+    ...options,
+    showCancel: true
+  })
+}
+
+function resetDialog() {
+  Object.assign(dialog, {
+    open: false,
+    title: '',
+    message: '',
+    confirmText: '確定',
+    cancelText: '取消',
+    showCancel: false,
+    danger: false,
+    confirmClass: '',
+    resolve: null
+  })
+}
+
+function confirmDialog() {
+  const resolve = dialog.resolve
+  resetDialog()
+  resolve?.(true)
+}
+
+function cancelDialog() {
+  const resolve = dialog.resolve
+  resetDialog()
+  resolve?.(false)
 }
 
 function fillEditForm(source) {
@@ -556,6 +674,13 @@ function closeInviteModal() {
 function closeTransferModal() {
   transferModalOpen.value = false
   resetTransferForm()
+}
+
+function normalizeInviteUserId() {
+  inviteForm.user_id = inviteForm.user_id
+    .toUpperCase()
+    .replace(/[^D0-9]/g, '')
+    .slice(0, 8)
 }
 
 async function loadUser() {
@@ -706,8 +831,13 @@ async function inviteMember() {
     showToast('隊伍已額滿，無法邀請')
     return
   }
+  normalizeInviteUserId()
   if (!inviteForm.user_id) {
     showToast('請輸入成員學號')
+    return
+  }
+  if (!/^D[0-9]{7}$/.test(inviteForm.user_id)) {
+    showToast('學號格式必須為 D 加 7 位數字，例如 D1234567')
     return
   }
 
@@ -765,7 +895,13 @@ async function updateCountdown(countdown, payload) {
 }
 
 async function deleteCountdown(countdown) {
-  if (!window.confirm('確定要刪除此倒數嗎？')) {
+  const confirmed = await requestConfirmation({
+    title: '刪除倒數',
+    message: '確定要刪除此倒數嗎？',
+    confirmText: '刪除',
+    danger: true
+  })
+  if (!confirmed) {
     return
   }
 
@@ -788,6 +924,9 @@ function groupRoleLabel(role) {
   }
   if (role === 'admin') {
     return '管理員'
+  }
+  if (role === 'invited') {
+    return '已邀請'
   }
   return '隊員'
 }
@@ -833,7 +972,13 @@ async function transferOwner() {
     showToast('請選擇新隊長')
     return
   }
-  if (!window.confirm('確定要轉移隊長嗎？')) {
+  const confirmed = await requestConfirmation({
+    title: '轉移隊長',
+    message: '確定要轉移隊長嗎？',
+    confirmText: '轉移',
+    danger: true
+  })
+  if (!confirmed) {
     return
   }
 
@@ -850,7 +995,13 @@ async function transferOwner() {
 }
 
 async function removeMember(member) {
-  if (!window.confirm(`確定要將 ${member.name} 移出隊伍嗎？`)) {
+  const confirmed = await requestConfirmation({
+    title: '移除隊員',
+    message: `確定要將 ${member.name} 移出隊伍嗎？`,
+    confirmText: '移除',
+    confirmClass: 'confirm-danger-action'
+  })
+  if (!confirmed) {
     return
   }
 
@@ -863,52 +1014,61 @@ async function removeMember(member) {
   }
 }
 
-async function saveAnnouncement() {
-  if (!announcementForm.content) {
-    showToast('請輸入公告內容')
-    return
-  }
+function openCreateAnnouncement() {
+  selectedAnnouncement.value = null
+  announcementModalMode.value = 'create'
+  announcementModalOpen.value = true
+}
 
+function openAnnouncementDetails(announcement) {
+  selectedAnnouncement.value = announcement
+  announcementModalMode.value = 'view'
+  announcementModalOpen.value = true
+}
+
+function closeAnnouncementModal() {
+  announcementModalOpen.value = false
+  selectedAnnouncement.value = null
+  announcementModalMode.value = 'view'
+}
+
+async function createAnnouncement(payload) {
   try {
-    if (announcementForm.id) {
-      await api.put(`/groups/${route.params.id}/announcements/${announcementForm.id}`, {
-        content: announcementForm.content
-      })
-      showToast('公告已更新')
-    } else {
-      await api.post(`/groups/${route.params.id}/announcements`, {
-        content: announcementForm.content
-      })
-      showToast('公告已新增')
-    }
-    resetAnnouncementForm()
+    await api.post(`/groups/${route.params.id}/announcements`, payload)
+    showToast('公告已新增')
+    closeAnnouncementModal()
     await loadAnnouncements()
   } catch (error) {
     showToast(error.response?.data?.message || '公告儲存失敗')
   }
 }
 
-function editAnnouncement(announcement) {
-  announcementForm.id = announcement.id
-  announcementForm.content = announcement.content
-}
-
-function resetAnnouncementForm() {
-  announcementForm.id = null
-  announcementForm.content = ''
+async function updateAnnouncement(announcement, payload) {
+  try {
+    await api.put(`/groups/${route.params.id}/announcements/${announcement.id}`, payload)
+    showToast('公告已更新')
+    closeAnnouncementModal()
+    await loadAnnouncements()
+  } catch (error) {
+    showToast(error.response?.data?.message || '公告儲存失敗')
+  }
 }
 
 async function deleteAnnouncement(announcement) {
-  if (!window.confirm('確定要刪除這則公告嗎？')) {
+  const confirmed = await requestConfirmation({
+    title: '刪除公告',
+    message: '確定要刪除這則公告嗎？',
+    confirmText: '刪除',
+    danger: true
+  })
+  if (!confirmed) {
     return
   }
 
   try {
     await api.delete(`/groups/${route.params.id}/announcements/${announcement.id}`)
-    if (announcementForm.id === announcement.id) {
-      resetAnnouncementForm()
-    }
     showToast('公告已刪除')
+    closeAnnouncementModal()
     await loadAnnouncements()
   } catch (error) {
     showToast(error.response?.data?.message || '公告刪除失敗')
@@ -920,13 +1080,17 @@ async function handleMembershipAction() {
     return
   }
 
-  const confirmed = window.confirm(
-    group.value.relation === 'owned'
-      ? '確定要刪除這個隊伍嗎？'
-      : group.value.relation === 'pending'
-        ? '確定要取消申請嗎？'
-        : '確定要退出隊伍嗎？'
-  )
+  const message = group.value.relation === 'owned'
+    ? '確定要刪除這個隊伍嗎？'
+    : group.value.relation === 'pending'
+      ? '確定要取消申請嗎？'
+      : '確定要退出隊伍嗎？'
+  const confirmed = await requestConfirmation({
+    title: '確認操作',
+    message,
+    confirmText: '確定',
+    danger: group.value.relation === 'owned'
+  })
   if (!confirmed) {
     return
   }
@@ -949,7 +1113,17 @@ async function handleMembershipAction() {
 }
 
 async function deleteGroup() {
-  if (!group.value || !window.confirm('確定要刪除這個隊伍嗎？此操作無法復原。')) {
+  if (!group.value) {
+    return
+  }
+
+  const confirmed = await requestConfirmation({
+    title: '刪除隊伍',
+    message: '確定要刪除這個隊伍嗎？此操作無法復原。',
+    confirmText: '刪除',
+    danger: true
+  })
+  if (!confirmed) {
     return
   }
 
@@ -1044,6 +1218,26 @@ async function logout() {
   await router.replace({ name: 'login' })
 }
 
+watch(
+  () => [
+    canUseDiscussion.value,
+    showEditForm.value,
+    members.value.length,
+    applications.value.length,
+    countdowns.value.length,
+    announcements.value.length
+  ],
+  async () => {
+    await nextTick()
+    if (canUseDiscussion.value) {
+      startDiscussionLayoutObserver()
+    } else {
+      stopDiscussionLayoutObserver()
+    }
+  },
+  { flush: 'post' }
+)
+
 onMounted(async () => {
   try {
     await loadUser()
@@ -1051,6 +1245,8 @@ onMounted(async () => {
     if (canUseDiscussion.value) {
       await loadComments()
       startPolling()
+      await nextTick()
+      startDiscussionLayoutObserver()
     }
   } catch (error) {
     showToast(error.response?.data?.message || '隊伍資料載入失敗')
@@ -1062,5 +1258,6 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   stopPolling()
+  stopDiscussionLayoutObserver()
 })
 </script>

@@ -127,6 +127,12 @@ test('project owners invite users and invitees accept or reject invitations', as
     }, outsider.token);
     assert.equal(denied.status, 403);
 
+    var invalidStudentId = await request(ctx.app, 'POST', '/api/projects/' + project.id + '/invitations', {
+      user_id: 'D123'
+    }, owner.token);
+    assert.equal(invalidStudentId.status, 400);
+    assert.match(invalidStudentId.body.message, /學號格式/);
+
     var invited = await request(ctx.app, 'POST', '/api/projects/' + project.id + '/invitations', {
       user_id: invitee.user.id,
       message: 'Join our final project'
@@ -134,6 +140,12 @@ test('project owners invite users and invitees accept or reject invitations', as
     assert.equal(invited.status, 201);
     assert.equal(invited.body.invitation.invitee_id, invitee.user.id);
     assert.equal(invited.body.invitation.status, 'pending');
+
+    var pendingMembers = await request(ctx.app, 'GET', '/api/groups/' + project.id + '/members', null, owner.token);
+    assert.equal(pendingMembers.status, 200);
+    assert.deepEqual(pendingMembers.body.members.map(function(member) {
+      return member.group_role;
+    }), ['leader', 'invited']);
 
     var inviteeList = await request(ctx.app, 'GET', '/api/me/invitations', null, invitee.token);
     assert.equal(inviteeList.status, 200);
@@ -145,6 +157,10 @@ test('project owners invite users and invitees accept or reject invitations', as
     assert.equal(accepted.status, 200);
     assert.equal(accepted.body.invitation.status, 'accepted');
 
+    var inviteeListAfterAccept = await request(ctx.app, 'GET', '/api/me/invitations', null, invitee.token);
+    assert.equal(inviteeListAfterAccept.status, 200);
+    assert.deepEqual(inviteeListAfterAccept.body.invitations, []);
+
     var joinedGroup = await request(ctx.app, 'GET', '/api/groups/' + project.id, null, invitee.token);
     assert.equal(joinedGroup.status, 200);
     assert.equal(joinedGroup.body.group.relation, 'joined');
@@ -154,6 +170,15 @@ test('project owners invite users and invitees accept or reject invitations', as
     assert.deepEqual(members.body.members.map(function(member) {
       return member.relation;
     }), ['owned', 'joined']);
+
+    var left = await request(ctx.app, 'DELETE', '/api/groups/' + project.id + '/membership', null, invitee.token);
+    assert.equal(left.status, 200);
+
+    var reinvited = await request(ctx.app, 'POST', '/api/projects/' + project.id + '/invitations', {
+      user_id: invitee.user.id
+    }, owner.token);
+    assert.equal(reinvited.status, 201);
+    assert.equal(reinvited.body.invitation.status, 'pending');
 
     var rejectedInvitee = await register(ctx.app, '04');
     var secondInvite = await request(ctx.app, 'POST', '/api/projects/' + project.id + '/invitations', {

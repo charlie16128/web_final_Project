@@ -39,6 +39,15 @@ test('phase four axios interceptor logs out suspended or stale-token responses',
   assert.match(api, /message\.includes\('停權'\)/);
   assert.match(api, /message\.includes\('登入狀態已失效'\)/);
   assert.match(api, /message\.includes\('登入已失效'\)/);
+  assert.match(api, /sessionStorage\.setItem\('teamup_login_notice'/);
   assert.match(api, /localStorage\.removeItem\('teamup_token'\)/);
   assert.match(api, /window\.location\.assign\('\/login'\)/);
+
+  var login = readClient('src/views/LoginView.vue');
+  assert.match(login, /<AppDialog/);
+  assert.match(login, /teamup_login_notice/);
+  assert.match(login, /isSuspensionMessage/);
+  assert.match(login, /suspensionNoticeMessage/);
+  assert.match(login, /formatSuspensionUntil/);
+  assert.match(login, /帳號已被停用至/);
 });

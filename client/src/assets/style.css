@@ -871,6 +871,11 @@ label {
 
 .discussion-panel {
   align-self: start;
+  display: flex;
+  flex-direction: column;
+  max-height: var(--discussion-panel-max-height, none);
+  min-height: 0;
+  overflow: hidden;
 }
 
 .group-edit-form {
@@ -930,6 +935,19 @@ button.danger:hover {
   transform: scale(1.02);
 }
 
+button.confirm-danger-action {
+  background: transparent;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  min-height: 42px;
+  padding: 0 16px;
+}
+
+button.confirm-danger-action:hover {
+  background: #fff1f2;
+  color: var(--accent);
+}
+
 .detail-grid {
   display: grid;
   gap: 12px;
@@ -957,8 +975,13 @@ button.danger:hover {
 
 .board-comments {
   border-top: 0;
+  flex: 1 1 auto;
   margin-top: 14px;
+  min-height: 0;
+  overflow-y: auto;
   padding-top: 0;
+  overscroll-behavior: contain;
+  padding-right: 4px;
 }
 
 .board-comments .comment {
@@ -1132,6 +1155,11 @@ button.danger:hover {
 .group-role-badge.role-admin {
   background: #fee2e2;
   color: #b91c1c;
+}
+
+.group-role-badge.role-invited {
+  background: #ede9fe;
+  color: #5b21b6;
 }
 
 .member-role-actions {
@@ -1404,6 +1432,52 @@ button.danger:hover {
   flex-wrap: wrap;
   gap: 8px;
   justify-content: flex-end;
+}
+
+.topbar,
+.main-navbar,
+.page-shell,
+.group-layout,
+.admin-layout,
+.floating-modal,
+.toast {
+  font-size: 12px;
+}
+
+.auth-shell,
+.auth-shell .floating-modal,
+.auth-shell .toast {
+  font-size: 15px;
+}
+
+.topbar h1 {
+  font-size: clamp(22px, 3.2vw, 38px);
+}
+
+.section-title h2 {
+  font-size: 17px;
+}
+
+.project-head h2,
+.project-head h3,
+.modal-head h2 {
+  font-size: 19px;
+}
+
+.auth-shell .modal-head h2 {
+  font-size: 24px;
+}
+
+.modal-close {
+  font-size: 14px;
+}
+
+.auth-shell .modal-close {
+  font-size: 18px;
+}
+
+.badge {
+  font-size: 11px;
 }
 
 

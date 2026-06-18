@@ -35,6 +35,12 @@ api.interceptors.response.use(
     if (shouldLogout) {
       localStorage.removeItem('teamup_token')
       localStorage.removeItem('teamup_user')
+      if (message) {
+        sessionStorage.setItem('teamup_login_notice', JSON.stringify({
+          message,
+          banned_until: error.response?.data?.banned_until || null
+        }))
+      }
       if (window.location.pathname !== '/login') {
         window.location.assign('/login')
       }
