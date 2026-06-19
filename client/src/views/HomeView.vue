@@ -21,7 +21,11 @@
 
   <main class="page-shell">
     <div class="project-page-column">
-      <ProjectForm @create="createProject" />
+      <ProjectForm
+        :disabled="!user"
+        disabled-text="登入已建立"
+        @create="createProject"
+      />
 
       <section class="toolbar">
         <input
@@ -54,18 +58,34 @@
         </article>
 
         <ProjectCard
-          v-for="project in projects"
+          v-for="project in displayedProjects"
           :key="project.id"
           :project="project"
           :user="user"
-          @apply="applyProject"
+          @apply="openApplyModal"
           @favorite="toggleFavorite"
           @report="reportProject"
           @update-application="updateApplication"
         />
+        <div
+          v-if="displayedProjects.length < projects.length"
+          ref="projectListSentinel"
+          class="project-list-sentinel"
+        ></div>
       </section>
     </div>
   </main>
+
+  <FloatingInputModal
+    v-if="applyProjectTarget"
+    title="申請加入"
+    label="申請訊息"
+    placeholder="可簡述你的技能或動機"
+    submit-text="送出申請"
+    :required="false"
+    @close="applyProjectTarget = null"
+    @submit="submitApplyModal"
+  />
 
   <FloatingInputModal
     v-if="reportProjectTarget"
@@ -81,7 +101,8 @@
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import api from '../services/api'
 import AccountModal from '../components/AccountModal.vue'
 import AppHeader from '../components/AppHeader.vue'
@@ -93,6 +114,8 @@ import ProjectForm from '../components/ProjectForm.vue'
 import ToastMessage from '../components/ToastMessage.vue'
 import { useDashboardBase } from '../composables/useDashboardBase'
 import { useProjects } from '../composables/useProjects'
+
+const router = useRouter()
 
 const {
   user,
@@ -118,11 +141,75 @@ const {
   reportProject,
   submitProjectReport,
   updateApplication
-} = useProjects({ user, showToast })
+} = useProjects({ user, showToast, onLoginRequired: requireLogin })
+
+const PROJECT_BATCH_SIZE = 5
+const visibleProjectCount = ref(PROJECT_BATCH_SIZE)
+const projectListSentinel = ref(null)
+const applyProjectTarget = ref(null)
+let projectObserver = null
 
 const isAdmin = computed(() => user.value?.role === 'admin' || user.value?.role === 'super_admin')
+const displayedProjects = computed(() => projects.value.slice(0, visibleProjectCount.value))
+
+function requireLogin() {
+  return router.push({ name: 'login' })
+}
+
+function loadMoreProjects() {
+  visibleProjectCount.value = Math.min(
+    visibleProjectCount.value + PROJECT_BATCH_SIZE,
+    projects.value.length
+  )
+}
+
+function observeProjectListSentinel() {
+  if (projectObserver) {
+    projectObserver.disconnect()
+    projectObserver = null
+  }
+
+  if (!projectListSentinel.value || displayedProjects.value.length >= projects.value.length) {
+    return
+  }
+
+  projectObserver = new IntersectionObserver((entries) => {
+    if (entries.some((entry) => entry.isIntersecting)) {
+      loadMoreProjects()
+    }
+  }, { rootMargin: '120px' })
+  projectObserver.observe(projectListSentinel.value)
+}
+
+function resetVisibleProjects() {
+  visibleProjectCount.value = PROJECT_BATCH_SIZE
+}
+
+function openApplyModal(project) {
+  if (!user.value) {
+    requireLogin()
+    return
+  }
+
+  applyProjectTarget.value = project
+}
+
+async function submitApplyModal(payload) {
+  if (!applyProjectTarget.value) {
+    return
+  }
+
+  const target = applyProjectTarget.value
+  applyProjectTarget.value = null
+  await applyProject(target, payload.message)
+}
 
 async function createProject(form) {
+  if (!user.value) {
+    await requireLogin()
+    return
+  }
+
   try {
     await api.post('/projects', form)
     showToast('隊伍已建立')
@@ -134,10 +221,31 @@ async function createProject(form) {
 
 onMounted(async () => {
   try {
-    await loadUser()
+    if (localStorage.getItem('teamup_token')) {
+      await loadUser()
+    }
     await loadProjects()
+    await nextTick()
+    observeProjectListSentinel()
   } catch (error) {
     showToast(error.response?.data?.message || '資料載入失敗')
   }
+})
+
+onBeforeUnmount(() => {
+  if (projectObserver) {
+    projectObserver.disconnect()
+  }
+})
+
+watch(projects, async () => {
+  resetVisibleProjects()
+  await nextTick()
+  observeProjectListSentinel()
+})
+
+watch(displayedProjects, async () => {
+  await nextTick()
+  observeProjectListSentinel()
 })
 </script>

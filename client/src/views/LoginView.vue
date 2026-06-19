@@ -11,13 +11,13 @@
         <div class="form-field">
           <label data-required data-error="*請輸入電子郵件">
             Email
-            <input class="auth-input" v-model.trim="form.email" type="email" autofocus autocomplete="email">
+            <input class="auth-input" v-model.trim="form.email" type="email" autofocus autocomplete="email" placeholder="test0001@gamil.com">
           </label>
         </div>
         <div class="form-field">
           <label data-required data-error="*請輸入密碼">
             密碼
-            <input class="auth-input" v-model="form.password" type="password" autocomplete="current-password">
+            <input class="auth-input" v-model="form.password" type="password" autocomplete="current-password" placeholder="test0001">
           </label>
         </div>
         <button type="submit" :disabled="loading">{{ loading ? '登入中...' : '登入' }}</button>

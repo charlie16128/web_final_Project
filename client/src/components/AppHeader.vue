@@ -10,7 +10,7 @@
     </div>
     <div class="user-panel">
       <span v-if="user" :title="formatDisplayName(user)">您好 <DisplayName :user="user" /></span>
-      <span v-else>尚未登入</span>
+      <RouterLink v-else class="appheaderbutton" :to="{ name: 'login' }">前往登入</RouterLink>
       <RouterLink v-if="backHome" class="button ghost" :to="{ name: 'home' }">回首頁</RouterLink>
       <button v-if="user && showAccount" class="appheaderbutton" type="button" @click="$emit('account')">帳號設定</button>
       <button v-if="user" class="appheaderbutton" type="button" @click="$emit('logout')">登出</button>
@@ -42,9 +42,17 @@ defineEmits(['account', 'logout'])
 
 <style scoped>
 .appheaderbutton {
-  color: white;
+  align-items: center;
   background-color: transparent;
   border: 1px solid var(--line);
+  color: white;
+  display: inline-flex;
+  font-weight: 700;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 16px;
+  text-decoration: none;
+  border-radius: var(--radius);
 }
 
 .appheaderbutton:hover{

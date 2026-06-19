@@ -17,6 +17,7 @@
   --topbar-accent: #93c5fd;
   --tab-bg: #e8edf5;
   --tab-active: #ffffff;
+  --radius: 16px;
   --shadow: 0 20px 55px rgba(15, 23, 42, 0.12);
 }
 
@@ -560,7 +561,7 @@ label {
 
 .project-card {
   background: var(--panel);
-  border: 1px solid var(--line);
+  border: 1.5px solid var(--line);
   border-radius: 8px;
   display: grid;
   gap: 14px;
@@ -626,7 +627,13 @@ label {
   gap: 6px;
 }
 
-.card-actions,
+.card-actions {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1fr auto auto;
+}
+
 .comment-form {
   display: grid;
   gap: 10px;
@@ -929,7 +936,7 @@ label {
 }
 
 .compact-action {
-  min-height: 34px;
+  min-height: 42px;
   padding: 0 12px;
 }
 
@@ -1560,4 +1567,52 @@ button.confirm-danger-action:hover {
   .applications-list .application-row {
     grid-template-columns: 1fr;
   }
+}
+
+.project-list-sentinel {
+  min-height: 1px;
+}
+
+.project-form-slide-enter-active,
+.project-form-slide-leave-active {
+  max-height: 720px;
+  opacity: 1;
+  overflow: hidden;
+  transition: max-height 260ms ease, opacity 200ms ease, transform 220ms ease;
+}
+
+.project-form-slide-enter-from,
+.project-form-slide-leave-to {
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+button,
+.button,
+input:not([type="checkbox"]),
+textarea,
+select,
+.panel,
+.project-card,
+.badge,
+.skill-tag,
+.group-role-badge,
+.group-item,
+.mini-item,
+.comment,
+.checkbox-row,
+.summary-strip,
+.account-modal,
+.floating-modal,
+.modal-item,
+.toast,
+.admin-entry-button,
+.select-trigger,
+.select-menu,
+.select-option,
+.countdown-card,
+.announcement-card,
+.countdown-empty {
+  border-radius: var(--radius) !important;
 }

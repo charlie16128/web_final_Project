@@ -1,7 +1,13 @@
 import { reactive, ref } from 'vue'
 import api from '../services/api'
 
-export function useProjects({ user, showToast, onApplicationSubmitted, onApplicationUpdated } = {}) {
+export function useProjects({
+  user,
+  showToast,
+  onLoginRequired,
+  onApplicationSubmitted,
+  onApplicationUpdated
+} = {}) {
   const projects = ref([])
   const reportProjectTarget = ref(null)
   const filters = reactive({
@@ -30,7 +36,6 @@ export function useProjects({ user, showToast, onApplicationSubmitted, onApplica
       accepting_applications: Boolean(project.accepting_applications),
       is_favorited: Boolean(project.is_favorited),
       application_status: project.application_status || '',
-      applyMessage: '',
       commentContent: '',
       comments: [],
       applications: []
@@ -43,6 +48,11 @@ export function useProjects({ user, showToast, onApplicationSubmitted, onApplica
   }
 
   async function loadProjects() {
+    if (filters.filter === 'favorited' && !user?.value) {
+      await onLoginRequired?.()
+      return
+    }
+
     const response = await api.get('/projects', {
       params: {
         q: filters.q || undefined,
@@ -70,6 +80,11 @@ export function useProjects({ user, showToast, onApplicationSubmitted, onApplica
   }
 
   async function toggleFavorite(project) {
+    if (!user?.value) {
+      await onLoginRequired?.()
+      return
+    }
+
     try {
       if (project.is_favorited) {
         await api.delete(`/projects/${project.id}/favorite`)
@@ -89,13 +104,17 @@ export function useProjects({ user, showToast, onApplicationSubmitted, onApplica
     }
   }
 
-  async function applyProject(project) {
+  async function applyProject(project, message = '') {
+    if (!user?.value) {
+      await onLoginRequired?.()
+      return
+    }
+
     try {
       const response = await api.post(`/projects/${project.id}/apply`, {
-        message: project.applyMessage
+        message
       })
       project.application_status = response.data.application?.status || 'pending'
-      project.applyMessage = ''
       showToast('申請已送出')
       await loadProjects()
       await onApplicationSubmitted?.()
@@ -105,6 +124,11 @@ export function useProjects({ user, showToast, onApplicationSubmitted, onApplica
   }
 
   function reportProject(project) {
+    if (!user?.value) {
+      onLoginRequired?.()
+      return
+    }
+
     reportProjectTarget.value = project
   }
 

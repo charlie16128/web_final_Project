@@ -49,18 +49,10 @@
       >
         檢舉
       </button>
-    </div>
-
-    <form class="card-actions" @submit.prevent="$emit('apply', project)">
-      <input
-        v-model.trim="project.applyMessage"
-        :disabled="!canApply"
-        placeholder="申請訊息，可簡述你的技能或動機"
-      >
-      <button type="submit" :disabled="!canApply">
+      <button class="compact-action" type="button" :disabled="!isLoginRequired && !canApply" @click="$emit('apply', project)">
         {{ applyButtonText }}
       </button>
-    </form>
+    </div>
 
 
 
@@ -110,6 +102,7 @@ const isOwner = computed(() => {
 })
 const tags = computed(() => skillTags(props.project.required_skills))
 const isFull = computed(() => isProjectFull(props.project))
+const isLoginRequired = computed(() => !props.user)
 const canApply = computed(() => canApplyToProject(props.project, props.user))
 const statusLabel = computed(() => {
   if (isFull.value) return '已額滿'
@@ -120,6 +113,7 @@ const statusClass = computed(() => {
   return props.project.accepting_applications ? 'open' : 'paused'
 })
 const applyButtonText = computed(() => {
+  if (isLoginRequired.value) return '登入後申請'
   if (props.project.application_status === 'pending') return '已申請'
   if (props.project.application_status === 'accepted') return '已加入'
   if (!props.project.accepting_applications) return '暫停申請'
