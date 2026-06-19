@@ -28,5 +28,5 @@ export function capacityText(project) {
 }
 
 export function favoriteText(project) {
-  return project?.is_favorited ? '取消收藏' : '收藏'
+  return project?.is_favorited ? '取消收藏' : '⭐'
 }

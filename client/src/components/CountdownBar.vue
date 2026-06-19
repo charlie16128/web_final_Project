@@ -68,7 +68,7 @@ defineEmits(['add', 'open'])
   border-radius: 8px;
   color: #475569;
   display: inline-flex;
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 700;
   min-height: 42px;
   padding: 0 12px;

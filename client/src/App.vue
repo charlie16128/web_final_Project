@@ -1,20 +1,23 @@
 <template>
-  <RouterView />
-  <SystemWarningModal
-    v-if="warnings.length"
-    :warnings="warnings"
-    @dismiss="dismissWarning"
-  />
+  <div :class="['app-frame', { 'app-frame--auth': isAuthRoute }]">
+    <RouterView />
+    <SystemWarningModal
+      v-if="warnings.length"
+      :warnings="warnings"
+      @dismiss="dismissWarning"
+    />
+  </div>
 </template>
 
 <script setup>
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import api from './services/api'
 import SystemWarningModal from './components/SystemWarningModal.vue'
 
 const route = useRoute()
 const warnings = ref([])
+const isAuthRoute = computed(() => route.name === 'login' || route.name === 'register')
 
 async function loadWarnings() {
   if (!localStorage.getItem('teamup_token')) {

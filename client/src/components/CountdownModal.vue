@@ -218,7 +218,7 @@ watch(
 
 .countdown-detail-grid dt {
   color: #475569;
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 800;
   margin-bottom: 4px;
 }

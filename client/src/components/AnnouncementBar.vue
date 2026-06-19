@@ -129,7 +129,7 @@ function formatTime(value) {
 .announcement-card small,
 .countdown-empty {
   color: #475569;
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 700;
 }
 

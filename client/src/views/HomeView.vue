@@ -2,6 +2,14 @@
   <AppHeader :user="user" show-account @account="showAccountModal = true" @logout="logout" />
   <MainNavbar />
 
+  <RouterLink
+      v-if="isAdmin"
+      class="admin-entry-button"
+      :to="{ name: 'admin' }"
+    >
+      管理員專用介面
+  </RouterLink>
+
   <AccountModal
     v-if="user && showAccountModal"
     :user="user"

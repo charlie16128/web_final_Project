@@ -216,7 +216,7 @@ label[data-error]:has(textarea[aria-invalid="true"]) textarea {
 
 .select-arrow {
   color: var(--muted);
-  font-size: 18px;
+  font-size: 23px;
   line-height: 1;
   transition: transform 160ms ease;
 }
@@ -539,7 +539,7 @@ label {
   border-radius: 999px;
   color: var(--primary-dark);
   flex: 0 0 auto;
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 800;
   padding: 2px 8px;
 }
@@ -964,7 +964,7 @@ button.confirm-danger-action:hover {
 
 .detail-grid dt {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 800;
   margin-bottom: 4px;
 }
@@ -1130,7 +1130,7 @@ button.confirm-danger-action:hover {
 .group-role-badge {
   border-radius: 999px;
   display: inline-flex;
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 800;
   justify-self: start;
   line-height: 1;
@@ -1200,15 +1200,15 @@ button.confirm-danger-action:hover {
 }
 
 .message {
-  font-size: 20px;
+  font-size: 25px;
 }
 
 .message-author {
-  font-size: 14px;
+  font-size: 18px;
 }
 
 .message-time {
-  font-size: 11px;
+  font-size: 14px;
 }
 
 .display-name {
@@ -1233,7 +1233,7 @@ button.confirm-danger-action:hover {
   border: 1px solid #c8d8f4;
   border-radius: 999px;
   color: #24436f;
-  font-size: 0.82rem;
+  font-size: 1.025rem;
   font-weight: 600;
   line-height: 1;
   padding: 6px 10px;
@@ -1355,7 +1355,7 @@ button.confirm-danger-action:hover {
 
 .modal-error {
   color: var(--accent);
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 800;
 }
 
@@ -1375,7 +1375,7 @@ button.confirm-danger-action:hover {
 
 .modal-hint {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 700;
   grid-column: 1 / -1;
 }
@@ -1407,7 +1407,7 @@ button.confirm-danger-action:hover {
 
 .admin-report-meta dt {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 800;
 }
 
@@ -1441,7 +1441,7 @@ button.confirm-danger-action:hover {
 .admin-layout,
 .floating-modal,
 .toast {
-  font-size: 12px;
+  font-size: 15px;
 }
 
 .auth-shell,
@@ -1451,17 +1451,17 @@ button.confirm-danger-action:hover {
 }
 
 .topbar h1 {
-  font-size: clamp(22px, 3.2vw, 38px);
+  font-size: clamp(28px, 4vw, 48px);
 }
 
 .section-title h2 {
-  font-size: 17px;
+  font-size: 21px;
 }
 
 .project-head h2,
 .project-head h3,
 .modal-head h2 {
-  font-size: 19px;
+  font-size: 24px;
 }
 
 .auth-shell .modal-head h2 {
@@ -1469,7 +1469,7 @@ button.confirm-danger-action:hover {
 }
 
 .modal-close {
-  font-size: 14px;
+  font-size: 18px;
 }
 
 .auth-shell .modal-close {
@@ -1477,7 +1477,15 @@ button.confirm-danger-action:hover {
 }
 
 .badge {
-  font-size: 11px;
+  font-size: 14px;
+}
+
+.app-frame:not(.app-frame--auth) label[data-error]::after {
+  font-size: 16px;
+}
+
+.app-frame:not(.app-frame--auth) .field-error {
+  font-size: 15px;
 }
 
 
