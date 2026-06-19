@@ -22,6 +22,33 @@ test('project applications open a floating message modal instead of inline card 
   assert.match(projects, /async function applyProject\(project, message = ''\)/);
 });
 
+test('project github repo links are editable and open from project cards and group details', function() {
+  var projectForm = readClient('src/components/ProjectForm.vue');
+  var projectCard = readClient('src/components/ProjectCard.vue');
+  var groupView = readClient('src/views/GroupView.vue');
+  var style = readClient('src/assets/style.css');
+
+  assert.match(projectForm, /v-model\.trim="form\.github_url"/);
+  assert.match(projectForm, /placeholder="https:\/\/github\.com\//);
+  assert.match(projectForm, /github_url:\s*''/);
+
+  assert.match(projectCard, /project\.github_url/);
+  assert.match(projectCard, /class="github-link"/);
+  assert.match(projectCard, /target="_blank"/);
+  assert.match(projectCard, /rel="noopener noreferrer"/);
+  assert.match(projectCard, /d="m12\.301 0h\.093/);
+
+  assert.match(groupView, /v-if="group\.github_url"/);
+  assert.match(groupView, /:href="group\.github_url"/);
+  assert.match(groupView, /v-model\.trim="editForm\.github_url"/);
+  assert.match(groupView, /github_url:\s*editForm\.github_url/);
+
+  assert.match(style, /\.github-link/);
+  assert.match(style, /\.github-icon/);
+  assert.doesNotMatch(style, /padding:\s*18px 72px 18px 18px/);
+  assert.doesNotMatch(style, /\.project-card \.github-link\s*\{[\s\S]*?position:\s*absolute/);
+});
+
 test('home project list reveals projects in batches of five while scrolling', function() {
   var homeView = readClient('src/views/HomeView.vue');
 

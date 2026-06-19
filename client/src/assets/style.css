@@ -624,7 +624,34 @@ label {
 .badge-stack {
   align-items: flex-end;
   display: grid;
-  gap: 6px;
+  gap: 16px;
+}
+
+.github-link {
+  align-items: center;
+  background: #111827;
+  border: 1px solid #111827;
+  color: #ffffff;
+  display: inline-flex;
+  height: 38px;
+  justify-content: center;
+  justify-self: end;
+  text-decoration: none;
+  transform: none;
+  width: 38px;
+}
+
+.github-link:hover {
+  background: #ffffff;
+  color: #111827;
+  transform: none;
+}
+
+.github-icon {
+  display: block;
+  fill: currentColor;
+  height: 22px;
+  width: 22px;
 }
 
 .card-actions {
@@ -1611,6 +1638,7 @@ select,
 .select-trigger,
 .select-menu,
 .select-option,
+.github-link,
 .countdown-card,
 .announcement-card,
 .countdown-empty {

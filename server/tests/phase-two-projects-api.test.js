@@ -202,3 +202,56 @@ test('project list exposes pending application status after the user applies', a
     await ctx.cleanup();
   }
 });
+
+test('project github urls are optional, persisted, and must use github prefix', async function() {
+  var ctx = createContext();
+  try {
+    var owner = await register(ctx.app, '07');
+    var repoUrl = 'https://github.com/teamup-campus/final-project';
+
+    var created = await createProject(ctx.app, owner.token, {
+      title: 'GitHub Project',
+      github_url: repoUrl
+    });
+    assert.equal(created.github_url, repoUrl);
+
+    var listed = await request(ctx.app, 'GET', '/api/projects');
+    assert.equal(listed.status, 200);
+    assert.equal(listed.body.projects[0].github_url, repoUrl);
+
+    var group = await request(ctx.app, 'GET', '/api/groups/' + created.id, null, owner.token);
+    assert.equal(group.status, 200);
+    assert.equal(group.body.group.github_url, repoUrl);
+
+    var invalidCreate = await request(ctx.app, 'POST', '/api/projects', {
+      title: 'Invalid GitHub Project',
+      description: 'Invalid github url test',
+      max_members: 3,
+      github_url: 'https://gitlab.com/teamup-campus/final-project'
+    }, owner.token);
+    assert.equal(invalidCreate.status, 400);
+    assert.match(invalidCreate.body.message, /GitHub|github/);
+
+    var updated = await request(ctx.app, 'PATCH', '/api/groups/' + created.id, {
+      title: 'GitHub Project',
+      description: 'Project with updated GitHub repo',
+      max_members: 3,
+      accepting_applications: true,
+      github_url: 'https://github.com/teamup-campus/updated-repo'
+    }, owner.token);
+    assert.equal(updated.status, 200);
+    assert.equal(updated.body.project.github_url, 'https://github.com/teamup-campus/updated-repo');
+
+    var cleared = await request(ctx.app, 'PATCH', '/api/groups/' + created.id, {
+      title: 'GitHub Project',
+      description: 'Project with optional GitHub repo cleared',
+      max_members: 3,
+      accepting_applications: true,
+      github_url: ''
+    }, owner.token);
+    assert.equal(cleared.status, 200);
+    assert.equal(cleared.body.project.github_url, '');
+  } finally {
+    await ctx.cleanup();
+  }
+});

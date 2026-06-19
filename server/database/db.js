@@ -253,12 +253,14 @@ async function createCurrentSchema() {
       'status TEXT DEFAULT "open",' +
       'accepting_applications INTEGER DEFAULT 1,' +
       'contact TEXT,' +
+      'github_url TEXT,' +
       'owner_id TEXT NOT NULL,' +
       'created_at TEXT DEFAULT CURRENT_TIMESTAMP,' +
       'FOREIGN KEY(owner_id) REFERENCES users(student_id) ON DELETE CASCADE' +
     ')'
   );
   await addColumn('projects', 'accepting_applications INTEGER DEFAULT 1');
+  await addColumn('projects', 'github_url TEXT');
 
   await rawRun(
     'CREATE TABLE IF NOT EXISTS applications (' +
@@ -491,7 +493,7 @@ async function copyLegacyData(legacyTables) {
     columns = await tableColumns('projects_legacy_migration');
     await copyLegacyTable(
       'projects',
-      ['id', 'title', 'course_name', 'teacher_name', 'description', 'required_skills', 'current_members', 'max_members', 'status', 'accepting_applications', 'contact', 'owner_id', 'created_at'],
+      ['id', 'title', 'course_name', 'teacher_name', 'description', 'required_skills', 'current_members', 'max_members', 'status', 'accepting_applications', 'contact', 'github_url', 'owner_id', 'created_at'],
       [
         columnExpr(columns, 'id', 'NULL'),
         columnExpr(columns, 'title', '"未命名專題"'),
@@ -504,6 +506,7 @@ async function copyLegacyData(legacyTables) {
         coalesceColumnExpr(columns, 'status', '"open"'),
         coalesceColumnExpr(columns, 'accepting_applications', '1'),
         columnExpr(columns, 'contact', 'NULL'),
+        columnExpr(columns, 'github_url', 'NULL'),
         legacyUserReferenceExpr(columns, 'owner_id'),
         columnExpr(columns, 'created_at', 'CURRENT_TIMESTAMP')
       ]

@@ -68,6 +68,17 @@ function boolToInt(value, fallback) {
   return value === true || value === 'true' || value === 1 || value === '1' ? 1 : 0;
 }
 
+function normalizedGithubUrl(value) {
+  if (value === undefined || value === null) {
+    return '';
+  }
+  return String(value).trim();
+}
+
+function isValidGithubUrl(value) {
+  return !value || value.indexOf('https://github.com/') === 0;
+}
+
 function projectStatusFromCapacity(currentMembers, maxMembers) {
   var current = Number(currentMembers || 0);
   var max = Number(maxMembers || 0);
@@ -1666,10 +1677,15 @@ router.post('/projects', auth.authRequired, asyncHandler(async function(req, res
   var currentMembers = Number(body.current_members || 1);
   var maxMembers = Number(body.max_members);
   var status = projectStatusFromCapacity(currentMembers, maxMembers);
+  var githubUrl = normalizedGithubUrl(body.github_url);
+  if (!isValidGithubUrl(githubUrl)) {
+    res.status(400).json({ message: 'GitHub Repo 網址必須以 https://github.com/ 開頭' });
+    return;
+  }
 
   var result = await db.run(
-    'INSERT INTO projects (title, course_name, teacher_name, description, required_skills, current_members, max_members, status, accepting_applications, contact, owner_id) ' +
-      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO projects (title, course_name, teacher_name, description, required_skills, current_members, max_members, status, accepting_applications, contact, github_url, owner_id) ' +
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     [
       body.title,
       body.course_name || '',
@@ -1681,6 +1697,7 @@ router.post('/projects', auth.authRequired, asyncHandler(async function(req, res
       status,
       boolToInt(body.accepting_applications, 1),
       body.contact || '',
+      githubUrl,
       req.user.student_id
     ]
   );
@@ -1703,9 +1720,16 @@ async function updateProjectDetails(req, res) {
   var currentMembers = Number(body.current_members || project.current_members);
   var maxMembers = Number(body.max_members || project.max_members);
   var status = projectStatusFromCapacity(currentMembers, maxMembers);
+  var githubUrl = body.github_url === undefined
+    ? (project.github_url || '')
+    : normalizedGithubUrl(body.github_url);
+  if (!isValidGithubUrl(githubUrl)) {
+    res.status(400).json({ message: 'GitHub Repo 網址必須以 https://github.com/ 開頭' });
+    return;
+  }
 
   await db.run(
-    'UPDATE projects SET title = ?, course_name = ?, teacher_name = ?, description = ?, required_skills = ?, current_members = ?, max_members = ?, status = ?, accepting_applications = ?, contact = ? WHERE id = ?',
+    'UPDATE projects SET title = ?, course_name = ?, teacher_name = ?, description = ?, required_skills = ?, current_members = ?, max_members = ?, status = ?, accepting_applications = ?, contact = ?, github_url = ? WHERE id = ?',
     [
       body.title || project.title,
       body.course_name || '',
@@ -1717,6 +1741,7 @@ async function updateProjectDetails(req, res) {
       status,
       boolToInt(body.accepting_applications, project.accepting_applications),
       body.contact || '',
+      githubUrl,
       req.params.id
     ]
   );

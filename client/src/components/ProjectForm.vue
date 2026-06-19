@@ -18,6 +18,14 @@
         <label>目前人數<input v-model.number="form.current_members" type="number" min="1"></label>
         <label data-required data-error="*請輸入人數上限">人數上限<input v-model.number="form.max_members" type="number" min="2"></label>
         <label>聯絡方式<input v-model.trim="form.contact" placeholder="Email / Line / Discord"></label>
+        <label data-error="*GitHub Repo 網址必須以 https://github.com/ 開頭">
+          GitHub Repo
+          <input
+            v-model.trim="form.github_url"
+            pattern="https://github\.com/.*"
+            placeholder="https://github.com/owner/repo"
+          >
+        </label>
         <label class="full">需要技能<input v-model.trim="form.required_skills"></label>
         <label class="checkbox-row full">
           <input v-model="form.accepting_applications" type="checkbox">
@@ -61,6 +69,7 @@ function emptyProjectForm() {
     current_members: 1,
     max_members: 4,
     contact: '',
+    github_url: '',
     required_skills: '',
     accepting_applications: true,
     description: ''
