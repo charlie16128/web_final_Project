@@ -15,7 +15,6 @@
         v-model="groupTab"
         :groups="groups"
         :applications="myApplications"
-        :user="user"
       />
     </div>
   </main>

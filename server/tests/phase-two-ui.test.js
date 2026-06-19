@@ -61,3 +61,20 @@ test('home toolbar keeps refresh beside status and uses compact favorite buttons
   assert.match(style, /\.favorite-button\.compact/);
   assert.match(style, /width:\s*auto/);
 });
+
+test('home view owns the admin entry below the main navbar instead of the group sidebar', function() {
+  var homeView = readClient('src/views/HomeView.vue');
+  var groupSidebar = readClient('src/components/GroupSidebar.vue');
+  var navbarIndex = homeView.indexOf('<MainNavbar />');
+  var adminEntryIndex = homeView.indexOf('class="admin-entry-button"');
+
+  assert.ok(navbarIndex >= 0);
+  assert.ok(adminEntryIndex > navbarIndex);
+  assert.match(homeView, /v-if="isAdmin"/);
+  assert.match(homeView, /:to="\{ name: 'admin' \}"/);
+  assert.match(homeView, /role === 'admin'/);
+  assert.match(homeView, /role === 'super_admin'/);
+  assert.doesNotMatch(groupSidebar, /admin-entry-button/);
+  assert.doesNotMatch(groupSidebar, /name: 'admin'/);
+  assert.doesNotMatch(groupSidebar, /isAdmin/);
+});

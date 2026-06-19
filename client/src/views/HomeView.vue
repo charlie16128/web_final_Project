@@ -2,13 +2,14 @@
   <AppHeader :user="user" show-account @account="showAccountModal = true" @logout="logout" />
   <MainNavbar />
 
-  <RouterLink
-      v-if="isAdmin"
+  <div v-if="isAdmin" class="admin-entry-shell">
+    <RouterLink
       class="admin-entry-button"
       :to="{ name: 'admin' }"
     >
       管理員專用介面
-  </RouterLink>
+    </RouterLink>
+  </div>
 
   <AccountModal
     v-if="user && showAccountModal"
@@ -79,7 +80,7 @@
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import api from '../services/api'
 import AccountModal from '../components/AccountModal.vue'
 import AppHeader from '../components/AppHeader.vue'
@@ -116,6 +117,8 @@ const {
   submitProjectReport,
   updateApplication
 } = useProjects({ user, showToast })
+
+const isAdmin = computed(() => user.value?.role === 'admin' || user.value?.role === 'super_admin')
 
 async function createProject(form) {
   try {

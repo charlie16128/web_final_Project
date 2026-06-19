@@ -1271,6 +1271,11 @@ button.confirm-danger-action:hover {
   width: 100%;
 }
 
+.admin-entry-shell {
+  margin: 14px auto 0;
+  width: min(1100px, calc(100% - 32px));
+}
+
 .admin-entry-button:hover {
   background: #b91c1c;
   transform: none;
