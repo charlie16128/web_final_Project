@@ -85,11 +85,11 @@
             <button class="ghost compact-action" type="button" :disabled="member.role === 'super_admin'" @click="openWarnUser(member)">
               警告
             </button>
-            <button class="ghost danger compact-action" type="button" :disabled="member.role === 'super_admin'" @click="openBanUser(member)">
-              停權
+            <button class="ghost danger compact-action" type="button" :disabled="member.role === 'super_admin'" @click="toggleBanUser(member)">
+              {{ member.is_suspended ? '解除停權' : '停權' }}
             </button>
-            <button class="ghost compact-action" type="button" :disabled="member.role === 'super_admin' || !member.is_suspended" @click="unbanUser(member)">
-              解除
+            <button class="ghost danger compact-action" type="button" :disabled="member.role === 'super_admin'" @click="deleteUser(member)">
+              刪除帳號
             </button>
           </div>
         </div>
@@ -273,6 +273,14 @@ function openBanUser(member) {
   })
 }
 
+async function toggleBanUser(member) {
+  if (member.is_suspended) {
+    await unbanUser(member)
+    return
+  }
+  openBanUser(member)
+}
+
 async function submitActionModal(payload) {
   const target = actionModal.target
 
@@ -344,6 +352,20 @@ async function unbanUser(member) {
     showToast('已解除停權')
   } catch (error) {
     showToast(error.response?.data?.message || '解除停權失敗')
+  }
+}
+
+async function deleteUser(member) {
+  if (!window.confirm(`確定要刪除 ${member.name} 的帳號嗎？此操作無法復原。`)) {
+    return
+  }
+
+  try {
+    await api.delete(`/admin/users/${member.student_id}`)
+    users.value = users.value.filter((item) => item.student_id !== member.student_id)
+    showToast('帳號已刪除')
+  } catch (error) {
+    showToast(error.response?.data?.message || '刪除帳號失敗')
   }
 }
 

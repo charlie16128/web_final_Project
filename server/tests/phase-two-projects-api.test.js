@@ -178,3 +178,27 @@ test('full projects are returned as full and reject new applications', async fun
     await ctx.cleanup();
   }
 });
+
+test('project list exposes pending application status after the user applies', async function() {
+  var ctx = createContext();
+  try {
+    var owner = await register(ctx.app, '05');
+    var applicant = await register(ctx.app, '06');
+    var project = await createProject(ctx.app, owner.token, {
+      title: 'Pending Project'
+    });
+
+    var applied = await request(ctx.app, 'POST', '/api/projects/' + project.id + '/apply', {
+      message: 'I would like to join'
+    }, applicant.token);
+    assert.equal(applied.status, 201);
+    assert.equal(applied.body.application.status, 'pending');
+
+    var listed = await request(ctx.app, 'GET', '/api/projects', null, applicant.token);
+    assert.equal(listed.status, 200);
+    assert.equal(listed.body.projects[0].id, project.id);
+    assert.equal(listed.body.projects[0].application_status, 'pending');
+  } finally {
+    await ctx.cleanup();
+  }
+});

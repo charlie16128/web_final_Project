@@ -225,6 +225,28 @@ async function currentUser(studentId) {
   return db.get('SELECT * FROM users WHERE student_id = ?', [studentId]);
 }
 
+async function deleteUserAccount(studentId) {
+  var acceptedMemberships = await db.all(
+    'SELECT project_id FROM applications WHERE user_id = ? AND status = "accepted"',
+    [studentId]
+  );
+  var deleted = await db.run('DELETE FROM users WHERE student_id = ?', [studentId]);
+
+  if (deleted.changes) {
+    await Promise.all(acceptedMemberships.map(function(membership) {
+      return db.run(
+        'UPDATE projects ' +
+          'SET current_members = CASE WHEN current_members > 1 THEN current_members - 1 ELSE 1 END, ' +
+          'status = CASE WHEN status = "full" AND current_members - 1 < max_members THEN "open" ELSE status END ' +
+          'WHERE id = ?',
+        [membership.project_id]
+      );
+    }));
+  }
+
+  return deleted;
+}
+
 async function groupOrAdminForUser(projectId, userId) {
   var user = await currentUser(userId);
   if (!user) {
@@ -462,6 +484,18 @@ router.put('/users/me', auth.authRequired, asyncHandler(async function(req, res)
 
   var user = await db.get('SELECT * FROM users WHERE student_id = ?', [studentId]);
   res.json({ user: publicUser(user) });
+}));
+
+router.delete('/users/me', auth.authRequired, asyncHandler(async function(req, res) {
+  var studentId = req.user.student_id;
+  var current = await currentUser(studentId);
+  if (!current) {
+    res.status(401).json({ message: '登入狀態已失效，請重新登入' });
+    return;
+  }
+
+  await deleteUserAccount(studentId);
+  res.json({ message: '帳號已刪除', deleted_user_id: studentId });
 }));
 
 router.post('/reports', auth.authRequired, asyncHandler(async function(req, res) {
@@ -775,6 +809,21 @@ router.post('/admin/users/:student_id/unban', asyncHandler(async function(req, r
   res.json({ user: publicUser(await currentUser(targetUser.student_id)) });
 }));
 
+router.delete('/admin/users/:student_id', asyncHandler(async function(req, res) {
+  var targetUser = await currentUser(req.params.student_id);
+  if (!targetUser) {
+    res.status(404).json({ message: '找不到使用者' });
+    return;
+  }
+  if (targetUser.role === 'super_admin') {
+    res.status(400).json({ message: '不能刪除 super_admin' });
+    return;
+  }
+
+  await deleteUserAccount(targetUser.student_id);
+  res.json({ message: '帳號已刪除', deleted_user_id: targetUser.student_id });
+}));
+
 router.get('/projects', auth.optionalAuth, asyncHandler(async function(req, res) {
   var userId = req.user ? req.user.student_id : null;
   var favoriteFilter = req.query.filter === 'favorited';
@@ -789,7 +838,13 @@ router.get('/projects', auth.optionalAuth, asyncHandler(async function(req, res)
         'SELECT 1 FROM project_favorites ' +
         'WHERE project_favorites.project_id = projects.id ' +
         'AND project_favorites.user_id = ?' +
-      ') END AS is_favorited ' +
+      ') END AS is_favorited, ' +
+      'CASE WHEN ? IS NULL THEN NULL ELSE (' +
+        'SELECT applications.status FROM applications ' +
+        'WHERE applications.project_id = projects.id ' +
+        'AND applications.user_id = ? ' +
+        'ORDER BY applications.id DESC LIMIT 1' +
+      ') END AS application_status ' +
       'FROM projects JOIN users ON users.student_id = projects.owner_id ' +
       'WHERE (? IS NULL OR projects.status = ?) ' +
       'AND (? IS NULL OR projects.title LIKE ? OR projects.course_name LIKE ? OR projects.required_skills LIKE ?) ' +
@@ -807,6 +862,8 @@ router.get('/projects', auth.optionalAuth, asyncHandler(async function(req, res)
       ')) ' +
       'ORDER BY projects.created_at DESC',
     [
+      userId,
+      userId,
       userId,
       userId,
       req.query.status || null,

@@ -120,6 +120,8 @@ const statusClass = computed(() => {
   return props.project.accepting_applications ? 'open' : 'paused'
 })
 const applyButtonText = computed(() => {
+  if (props.project.application_status === 'pending') return '已申請'
+  if (props.project.application_status === 'accepted') return '已加入'
   if (!props.project.accepting_applications) return '暫停申請'
   if (isFull.value) return '已額滿'
   return '申請加入'

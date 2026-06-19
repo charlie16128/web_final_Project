@@ -20,6 +20,11 @@
       <label data-error="*密碼至少 6 碼">新密碼
         <input v-model.trim="form.password" type="password" minlength="6" placeholder="不修改可留空">
       </label>
+      <div class="account-danger-zone">
+        <button class="ghost danger delete-account-action" type="button" @click="$emit('delete-account')">
+          刪除帳號
+        </button>
+      </div>
       <div class="form-actions">
         <button class="ghost" type="button" @click="$emit('close')">取消</button>
         <button type="submit">儲存</button>
@@ -38,7 +43,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['close', 'save'])
+const emit = defineEmits(['close', 'save', 'delete-account'])
 
 const form = reactive({
   email: '',

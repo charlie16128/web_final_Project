@@ -193,3 +193,22 @@ test('user settings reject stale token instead of server error', async function(
     await ctx.cleanup();
   }
 });
+
+test('users can delete their own account and invalidate the token', async function() {
+  var ctx = createContext();
+  try {
+    var created = await register(ctx.app, '04');
+
+    var deleted = await request(ctx.app, 'DELETE', '/api/users/me', null, created.token);
+    assert.equal(deleted.status, 200);
+    assert.equal(deleted.body.message, '帳號已刪除');
+
+    var row = await ctx.db.get('SELECT student_id FROM users WHERE student_id = ?', [created.user.id]);
+    assert.equal(row, undefined);
+
+    var me = await request(ctx.app, 'GET', '/api/users/me', null, created.token);
+    assert.equal(me.status, 401);
+  } finally {
+    await ctx.cleanup();
+  }
+});

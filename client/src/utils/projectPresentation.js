@@ -19,7 +19,9 @@ export function canApplyToProject(project, user) {
     user &&
     project?.owner_id !== currentUserId &&
     project?.accepting_applications &&
-    !isProjectFull(project)
+    !isProjectFull(project) &&
+    project?.application_status !== 'pending' &&
+    project?.application_status !== 'accepted'
   )
 }
 

@@ -7,6 +7,7 @@
     :user="user"
     @close="showAccountModal = false"
     @save="saveAccountSettings"
+    @delete-account="deleteAccount"
   />
 
   <main class="page-shell">
@@ -105,6 +106,7 @@ const {
   showAccountModal,
   loadUser,
   saveAccountSettings,
+  deleteAccount,
   logout
 } = useDashboardBase()
 

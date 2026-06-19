@@ -36,6 +36,22 @@ export function useDashboardBase() {
     }
   }
 
+  async function deleteAccount() {
+    if (!window.confirm('確定要刪除帳號嗎？此操作無法復原。')) {
+      return
+    }
+
+    try {
+      await api.delete('/users/me')
+      showAccountModal.value = false
+      localStorage.removeItem('teamup_token')
+      localStorage.removeItem('teamup_user')
+      await router.replace({ name: 'login' })
+    } catch (error) {
+      showToast(error.response?.data?.message || '刪除帳號失敗')
+    }
+  }
+
   async function logout() {
     localStorage.removeItem('teamup_token')
     localStorage.removeItem('teamup_user')
@@ -49,6 +65,7 @@ export function useDashboardBase() {
     showAccountModal,
     loadUser,
     saveAccountSettings,
+    deleteAccount,
     logout
   }
 }

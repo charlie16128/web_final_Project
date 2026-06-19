@@ -29,6 +29,7 @@ export function useProjects({ user, showToast, onApplicationSubmitted, onApplica
       ...project,
       accepting_applications: Boolean(project.accepting_applications),
       is_favorited: Boolean(project.is_favorited),
+      application_status: project.application_status || '',
       applyMessage: '',
       commentContent: '',
       comments: [],
@@ -90,9 +91,10 @@ export function useProjects({ user, showToast, onApplicationSubmitted, onApplica
 
   async function applyProject(project) {
     try {
-      await api.post(`/projects/${project.id}/apply`, {
+      const response = await api.post(`/projects/${project.id}/apply`, {
         message: project.applyMessage
       })
+      project.application_status = response.data.application?.status || 'pending'
       project.applyMessage = ''
       showToast('申請已送出')
       await loadProjects()

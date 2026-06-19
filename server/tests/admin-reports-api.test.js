@@ -311,3 +311,42 @@ test('admins can search users and manage project teams', async function() {
     await ctx.cleanup();
   }
 });
+
+test('admins can delete user accounts and project member counts are repaired', async function() {
+  var ctx = createContext();
+  try {
+    var owner = await register(ctx.app, '11');
+    var member = await register(ctx.app, '12');
+    var admin = await loginSuperAdmin(ctx.app);
+    var project = await createProject(ctx.app, owner.token);
+
+    await request(ctx.app, 'POST', '/api/projects/' + project.id + '/apply', {
+      message: 'Please accept me'
+    }, member.token);
+    var pending = await request(ctx.app, 'GET', '/api/projects/' + project.id + '/applications', null, admin.token);
+    assert.equal(pending.status, 200);
+    assert.equal(pending.body.applications.length, 1);
+    var accepted = await request(ctx.app, 'PUT', '/api/applications/' + pending.body.applications[0].id, {
+      status: 'accepted'
+    }, admin.token);
+    assert.equal(accepted.status, 200);
+
+    var beforeDelete = await request(ctx.app, 'GET', '/api/projects/' + project.id, null, admin.token);
+    assert.equal(beforeDelete.body.project.current_members, 2);
+
+    var deleted = await request(ctx.app, 'DELETE', '/api/admin/users/' + member.user.id, null, admin.token);
+    assert.equal(deleted.status, 200);
+    assert.equal(deleted.body.deleted_user_id, member.user.id);
+
+    var deletedUser = await ctx.db.get('SELECT student_id FROM users WHERE student_id = ?', [member.user.id]);
+    assert.equal(deletedUser, undefined);
+
+    var afterDelete = await request(ctx.app, 'GET', '/api/projects/' + project.id, null, admin.token);
+    assert.equal(afterDelete.body.project.current_members, 1);
+
+    var denied = await request(ctx.app, 'DELETE', '/api/admin/users/ADMIN2006', null, admin.token);
+    assert.equal(denied.status, 400);
+  } finally {
+    await ctx.cleanup();
+  }
+});

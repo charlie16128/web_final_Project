@@ -710,6 +710,15 @@ label {
   width: min(440px, 100%);
 }
 
+.account-danger-zone {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.delete-account-action {
+  width: 100%;
+}
+
 .modal-head,
 .form-actions {
   align-items: start;
