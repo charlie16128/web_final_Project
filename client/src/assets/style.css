@@ -653,6 +653,29 @@ label {
   font-weight: 700;
 }
 
+.popular-skill-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.popular-skill-pill {
+  background: var(--primary-soft);
+  border: 1px solid rgba(79, 70, 229, 0.16);
+  border-radius: 999px;
+  color: var(--primary-dark);
+  font-size: 12px;
+  font-weight: 800;
+  padding: 4px 8px;
+}
+
+.popular-skill-empty {
+  color: var(--muted);
+  font-weight: 700;
+  margin-top: 8px;
+}
+
 .empty-state {
   background: var(--panel);
   border: 1px dashed rgba(100, 116, 139, 0.42);

@@ -56,6 +56,16 @@
         <article>
           <strong>{{ topSkill || 'Vue' }}</strong>
           <span>熱門技能</span>
+          <div v-if="popularSkills.length" class="popular-skill-list" aria-label="熱門技能排名">
+            <span
+              v-for="skill in popularSkills"
+              :key="skill.name"
+              class="popular-skill-pill"
+            >
+              {{ skill.name }} {{ skill.count }} 次
+            </span>
+          </div>
+          <small v-else class="popular-skill-empty">等待資料</small>
         </article>
       </section>
 
@@ -200,7 +210,7 @@ const fullProjectCount = computed(() =>
     project.current_members >= project.max_members
   ).length
 )
-const topSkill = computed(() => {
+const popularSkills = computed(() => {
   const countMap = {}
 
   projects.value.forEach((project) => {
@@ -215,8 +225,11 @@ const topSkill = computed(() => {
   })
 
   return Object.entries(countMap)
-    .sort((a, b) => b[1] - a[1])?.[0]?.[0]
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+    .slice(0, 3)
 })
+const topSkill = computed(() => popularSkills.value[0]?.name)
 
 function requireLogin() {
   return router.push({ name: 'login' })

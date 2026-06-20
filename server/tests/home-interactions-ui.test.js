@@ -131,6 +131,24 @@ test('home first phase adds hero stats and a polished empty state', function() {
   assert.match(homeView, /目前沒有符合條件的隊伍/);
 });
 
+test('home popular skill stat explains the top skill with ranked counts', function() {
+  var homeView = readClient('src/views/HomeView.vue');
+  var style = readClient('src/assets/style.css');
+
+  assert.match(homeView, /const popularSkills = computed/);
+  assert.match(homeView, /Object\.entries\(countMap\)/);
+  assert.match(homeView, /\.sort\(\(a, b\) => b\.count - a\.count/);
+  assert.match(homeView, /\.slice\(0, 3\)/);
+  assert.match(homeView, /const topSkill = computed\(\(\) => popularSkills\.value\[0\]\?\.name/);
+  assert.match(homeView, /v-if="popularSkills\.length"/);
+  assert.match(homeView, /v-for="skill in popularSkills"/);
+  assert.match(homeView, /\{\{ skill\.name \}\}/);
+  assert.match(homeView, /\{\{ skill\.count \}\} 次/);
+  assert.match(homeView, /等待資料/);
+  assert.match(style, /\.popular-skill-list/);
+  assert.match(style, /\.popular-skill-pill/);
+});
+
 test('project creation form can be opened from the home hero call to action', function() {
   var projectForm = readClient('src/components/ProjectForm.vue');
 
