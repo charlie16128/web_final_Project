@@ -186,6 +186,11 @@ test('legacy sqlite users.id foreign keys migrate to users.student_id before pro
     assert.equal(ownerForeignKey[0].from, 'owner_id');
     assert.equal(ownerForeignKey[0].to, 'student_id');
 
+    var userColumns = await db.all('PRAGMA table_info(users)');
+    assert.equal(userColumns.some(function(column) {
+      return column.name === 'skills';
+    }), true);
+
     var legacyProject = await db.get('SELECT owner_id FROM projects WHERE title = ?', ['Legacy Project']);
     assert.equal(legacyProject.owner_id, 'D5555555');
 

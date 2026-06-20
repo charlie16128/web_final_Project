@@ -16,6 +16,7 @@
 
       <div class="badge-stack">
         <span class="badge" :class="statusClass">{{ statusLabel }}</span>
+        <span v-if="shouldShowMatch" class="match-badge">Match {{ matchPercent }}%</span>
         <a
           v-if="project.github_url"
           class="github-link"
@@ -114,9 +115,22 @@ const isOwner = computed(() => {
   return Boolean(currentUserId && currentUserId === props.project.owner_id)
 })
 const tags = computed(() => skillTags(props.project.required_skills))
+const userSkills = computed(() => skillTags(props.user?.skills))
 const isFull = computed(() => isProjectFull(props.project))
 const isLoginRequired = computed(() => !props.user)
 const canApply = computed(() => canApplyToProject(props.project, props.user))
+const matchPercent = computed(() => {
+  const requiredSkills = tags.value.map((skill) => skill.toLowerCase())
+  const mySkills = userSkills.value.map((skill) => skill.toLowerCase())
+
+  if (!requiredSkills.length || !mySkills.length) {
+    return 0
+  }
+
+  const matchedCount = requiredSkills.filter((skill) => mySkills.includes(skill)).length
+  return Math.round((matchedCount / requiredSkills.length) * 100)
+})
+const shouldShowMatch = computed(() => Boolean(props.user && tags.value.length && userSkills.value.length))
 const statusLabel = computed(() => {
   if (isFull.value) return '已額滿'
   return props.project.accepting_applications ? '開放中' : '暫停申請'

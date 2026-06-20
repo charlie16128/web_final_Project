@@ -47,6 +47,22 @@ test('home project list wires favorite filtering and project card favorite event
   assert.match(style, /\.favorite-button/);
 });
 
+test('project cards show logged-in skill match percent without a capacity progress bar', function() {
+  var projectCard = readClient('src/components/ProjectCard.vue');
+  var style = readClient('src/assets/style.css');
+
+  assert.doesNotMatch(projectCard, /class="capacity-bar"/);
+  assert.doesNotMatch(projectCard, /class="capacity-bar-fill"/);
+  assert.doesNotMatch(projectCard, /capacityPercent/);
+  assert.match(projectCard, /const matchPercent = computed/);
+  assert.match(projectCard, /props\.user\?\.skills/);
+  assert.match(projectCard, /class="match-badge"/);
+  assert.match(projectCard, /Match \{\{ matchPercent \}\}%/);
+  assert.doesNotMatch(style, /\.capacity-bar/);
+  assert.doesNotMatch(style, /\.capacity-bar-fill/);
+  assert.match(style, /\.match-badge/);
+});
+
 test('home toolbar keeps refresh beside status and uses compact favorite buttons', function() {
   var homeView = readClient('src/views/HomeView.vue');
   var projectCard = readClient('src/components/ProjectCard.vue');
@@ -78,4 +94,22 @@ test('home view owns the admin entry below the main navbar instead of the group 
   assert.doesNotMatch(groupSidebar, /admin-entry-button/);
   assert.doesNotMatch(groupSidebar, /name: 'admin'/);
   assert.doesNotMatch(groupSidebar, /isAdmin/);
+});
+
+test('group sidebar tabs do not scale or lift on hover', function() {
+  var groupSidebar = readClient('src/components/GroupSidebar.vue');
+  var style = readClient('src/assets/style.css');
+  var hoverBlock = style.slice(
+    style.indexOf('.group-tabs button:hover'),
+    style.indexOf('.group-list,', style.indexOf('.group-tabs button:hover'))
+  );
+
+  assert.match(groupSidebar, /class="segmented group-tabs"/);
+  assert.match(groupSidebar, />\s*全部 \{\{ counts\.all \}\}/);
+  assert.match(groupSidebar, />\s*已加入 \{\{ counts\.joined \}\}/);
+  assert.match(groupSidebar, />\s*我建立 \{\{ counts\.owned \}\}/);
+  assert.match(hoverBlock, /transform:\s*none/);
+  assert.match(hoverBlock, /box-shadow:\s*none/);
+  assert.doesNotMatch(hoverBlock, /scale\(/);
+  assert.doesNotMatch(hoverBlock, /translateY\(/);
 });

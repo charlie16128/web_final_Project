@@ -40,7 +40,7 @@ defineEmits(['add', 'open'])
 }
 
 .add-countdown-btn {
-  background: linear-gradient(135deg, #7c3aed, #2563eb);
+  background: linear-gradient(135deg, #047857, #f59e0b);
   border: none;
   border-radius: 8px;
   color: white;

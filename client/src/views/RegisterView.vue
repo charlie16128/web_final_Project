@@ -34,6 +34,17 @@
           </label>
         </div>
         <div class="form-field">
+          <label>
+            我的技能
+            <input
+              class="auth-input"
+              v-model.trim="form.skills"
+              placeholder="Vue, JavaScript, Node.js"
+              autocomplete="off"
+            >
+          </label>
+        </div>
+        <div class="form-field">
           <label data-required data-error="*密碼至少 6 碼，僅能使用英文或數字">
             密碼
             <input
@@ -68,6 +79,7 @@ const form = reactive({
   name: '',
   student_id: '',
   email: '',
+  skills: '',
   password: ''
 })
 

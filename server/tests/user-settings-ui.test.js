@@ -7,10 +7,11 @@ function readClient(filePath) {
   return fs.readFileSync(path.join(__dirname, '..', '..', 'client', filePath), 'utf8');
 }
 
-test('account settings moved to a Vue modal for email and password only', function() {
+test('account settings moved to a Vue modal and supports editable skills', function() {
   var home = readClient('src/views/HomeView.vue');
   var modal = readClient('src/components/AccountModal.vue');
   var dashboardBase = readClient('src/composables/useDashboardBase.js');
+  var registerView = readClient('src/views/RegisterView.vue');
 
   assert.match(home, /<AccountModal/);
   assert.match(home, /@save="saveAccountSettings"/);
@@ -20,8 +21,14 @@ test('account settings moved to a Vue modal for email and password only', functi
   assert.match(modal, /aria-modal="true"/);
   assert.match(modal, /v-model\.trim="form\.email"/);
   assert.match(modal, /v-model\.trim="form\.password"/);
+  assert.match(modal, /v-model\.trim="form\.skills"/);
+  assert.match(modal, /placeholder="Vue, JavaScript, Node\.js"/);
+  assert.match(modal, /skills:\s*form\.skills/);
   assert.match(modal, /:value="user\?\.student_id"/);
   assert.match(modal, /:value="user\?\.name"/);
   assert.doesNotMatch(modal, /v-model[^>]+student_id/);
   assert.doesNotMatch(modal, /v-model[^>]+name/);
+  assert.match(registerView, /v-model\.trim="form\.skills"/);
+  assert.match(registerView, /skills:\s*''/);
+  assert.match(registerView, /placeholder="Vue, JavaScript, Node\.js"/);
 });

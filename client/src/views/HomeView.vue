@@ -30,9 +30,6 @@
           </p>
         </div>
 
-        <button type="button" @click="openCreateProjectForm">
-          建立專題
-        </button>
       </section>
 
       <ProjectForm

@@ -20,6 +20,9 @@
       <label data-error="*密碼至少 6 碼">新密碼
         <input v-model.trim="form.password" type="password" minlength="6" placeholder="不修改可留空">
       </label>
+      <label>我的技能
+        <input v-model.trim="form.skills" placeholder="Vue, JavaScript, Node.js">
+      </label>
       <div class="account-danger-zone">
         <button class="ghost danger delete-account-action" type="button" @click="$emit('delete-account')">
           刪除帳號
@@ -47,7 +50,8 @@ const emit = defineEmits(['close', 'save', 'delete-account'])
 
 const form = reactive({
   email: '',
-  password: ''
+  password: '',
+  skills: ''
 })
 
 watch(
@@ -55,6 +59,7 @@ watch(
   (user) => {
     form.email = user?.email || ''
     form.password = ''
+    form.skills = user?.skills || ''
   },
   { immediate: true }
 )
@@ -62,7 +67,8 @@ watch(
 function submit() {
   emit('save', {
     email: form.email,
-    password: form.password
+    password: form.password,
+    skills: form.skills
   })
 }
 </script>

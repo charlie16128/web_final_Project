@@ -116,7 +116,6 @@ test('home first phase adds hero stats and a polished empty state', function() {
 
   assert.match(homeView, /class="home-hero"/);
   assert.match(homeView, /TeamUp Campus/);
-  assert.match(homeView, /@click="openCreateProjectForm"/);
   assert.match(homeView, /:open-signal="openCreateFormSignal"/);
   assert.match(homeView, /const openProjectCount = computed/);
   assert.match(homeView, /current_members < project\.max_members/);
@@ -129,6 +128,7 @@ test('home first phase adds hero stats and a polished empty state', function() {
   assert.match(homeView, /熱門技能/);
   assert.match(homeView, /class="empty-state"/);
   assert.match(homeView, /目前沒有符合條件的隊伍/);
+  assert.match(homeView, /@click="openCreateProjectForm"/);
 });
 
 test('home popular skill stat explains the top skill with ranked counts', function() {
@@ -161,10 +161,10 @@ test('phase one campus glass visual tokens and controls are defined globally', f
   var style = readClient('src/assets/style.css');
 
   assert.match(style, /--panel:\s*rgba\(255,\s*255,\s*255,\s*0\.86\)/);
-  assert.match(style, /--primary:\s*#4f46e5/);
+  assert.match(style, /--primary:\s*#047857/);
   assert.match(style, /--radius-sm:\s*10px/);
   assert.match(style, /--radius-lg:\s*24px/);
-  assert.match(style, /radial-gradient\(circle at top left, rgba\(79, 70, 229, 0\.13\)/);
+  assert.match(style, /radial-gradient\(circle at top left, rgba\(16, 185, 129, 0\.12\)/);
   assert.match(style, /\.panel,\s*\n\.project-card,\s*\n\.account-modal,\s*\n\.auth-card/);
   assert.match(style, /backdrop-filter:\s*blur\(14px\)/);
   assert.match(style, /button:hover\s*\{[\s\S]*transform:\s*translateY\(-1px\)/);
@@ -172,6 +172,44 @@ test('phase one campus glass visual tokens and controls are defined globally', f
   assert.match(style, /\.home-hero/);
   assert.match(style, /\.home-stats/);
   assert.match(style, /\.empty-state/);
+});
+
+test('home hero keeps the content but removes colored background treatment', function() {
+  var homeView = readClient('src/views/HomeView.vue');
+  var style = readClient('src/assets/style.css');
+  var heroTemplate = homeView.slice(
+    homeView.indexOf('<section class="home-hero">'),
+    homeView.indexOf('</section>', homeView.indexOf('<section class="home-hero">'))
+  );
+  var heroBlock = style.slice(
+    style.indexOf('.home-hero {'),
+    style.indexOf('.home-hero .eyebrow')
+  );
+
+  assert.match(heroBlock, /background:\s*var\(--panel\)/);
+  assert.match(heroBlock, /border:\s*1px solid rgba\(255,\s*255,\s*255,\s*0\.72\)/);
+  assert.match(heroBlock, /box-shadow:\s*var\(--shadow-sm\)/);
+  assert.match(heroBlock, /color:\s*var\(--ink\)/);
+  assert.doesNotMatch(heroBlock, /background:\s*linear-gradient/);
+  assert.doesNotMatch(heroBlock, /color:\s*white/);
+  assert.doesNotMatch(heroTemplate, /<button[\s\S]*openCreateProjectForm/);
+});
+
+test('campus glass palette avoids blue purple gradients', function() {
+  var style = readClient('src/assets/style.css');
+  var countdownBar = readClient('src/components/CountdownBar.vue');
+  var announcementBar = readClient('src/components/AnnouncementBar.vue');
+  var combined = [style, countdownBar, announcementBar].join('\n');
+  var heroBlock = style.slice(
+    style.indexOf('.home-hero {'),
+    style.indexOf('.home-hero .eyebrow')
+  );
+  var bluePurpleGradientTokens = /(?:linear|radial)-gradient\([^;]*(?:#4f46e5|#3730a3|#0ea5e9|#7c3aed|#2563eb|rgba\(79,\s*70,\s*229|rgba\(14,\s*165,\s*233|rgba\(124,\s*58,\s*237|rgba\(37,\s*99,\s*235)/;
+
+  assert.doesNotMatch(combined, bluePurpleGradientTokens);
+  assert.doesNotMatch(heroBlock, /background:\s*linear-gradient/);
+  assert.match(countdownBar, /linear-gradient\(135deg,\s*#047857,\s*#f59e0b\)/);
+  assert.match(announcementBar, /linear-gradient\(135deg,\s*#047857,\s*#f59e0b\)/);
 });
 
 test('project card and project actions send anonymous visitors to login', function() {

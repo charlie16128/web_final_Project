@@ -373,9 +373,10 @@ router.post('/register', asyncHandler(async function(req, res) {
   }
 
   var hash = await bcrypt.hash(body.password, 10);
+  var skills = String(body.skills || '').trim();
   await db.run(
-    'INSERT INTO users (username, name, student_id, email, password, role) VALUES (?, ?, ?, ?, ?, ?)',
-    [body.name, body.name, body.student_id, body.email, hash, 'user']
+    'INSERT INTO users (username, name, student_id, email, password, role, skills) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [body.name, body.name, body.student_id, body.email, hash, 'user', skills]
   );
   var user = await db.get('SELECT * FROM users WHERE student_id = ?', [body.student_id]);
   res.status(201).json({ token: auth.signToken(user), user: publicUser(user) });
@@ -476,6 +477,7 @@ router.put('/users/me', auth.authRequired, asyncHandler(async function(req, res)
   }
 
   var email = String(body.email).trim();
+  var skills = String(body.skills || '').trim();
   var exists = await db.get('SELECT student_id FROM users WHERE email = ? AND student_id != ?', [email, studentId]);
   if (exists) {
     res.status(409).json({ message: 'Email 已被使用' });
@@ -488,9 +490,9 @@ router.put('/users/me', auth.authRequired, asyncHandler(async function(req, res)
       return;
     }
     var hash = await bcrypt.hash(body.password, 10);
-    await db.run('UPDATE users SET email = ?, password = ? WHERE student_id = ?', [email, hash, studentId]);
+    await db.run('UPDATE users SET email = ?, password = ?, skills = ? WHERE student_id = ?', [email, hash, skills, studentId]);
   } else {
-    await db.run('UPDATE users SET email = ? WHERE student_id = ?', [email, studentId]);
+    await db.run('UPDATE users SET email = ?, skills = ? WHERE student_id = ?', [email, skills, studentId]);
   }
 
   var user = await db.get('SELECT * FROM users WHERE student_id = ?', [studentId]);

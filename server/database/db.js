@@ -227,6 +227,7 @@ async function createCurrentSchema() {
   await addColumn('users', 'avatar TEXT');
   await addColumn('users', 'department TEXT');
   await addColumn('users', 'grade TEXT');
+  await addColumn('users', 'skills TEXT DEFAULT ""');
   await addColumn('users', 'github_url TEXT');
   await addColumn('users', 'is_suspended INTEGER DEFAULT 0');
   await addColumn('users', 'suspended_until TEXT');

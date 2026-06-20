@@ -76,7 +76,7 @@ function formatTime(value) {
 }
 
 .add-countdown-btn {
-  background: linear-gradient(135deg, #7c3aed, #2563eb);
+  background: linear-gradient(135deg, #047857, #f59e0b);
   border: none;
   border-radius: 8px;
   color: white;
@@ -115,7 +115,7 @@ function formatTime(value) {
 }
 
 .announcement-card:hover {
-  border-color: rgba(37, 99, 235, 0.45);
+  border-color: rgba(4, 120, 87, 0.45);
   transform: translateY(-1px);
 }
 

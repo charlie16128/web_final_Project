@@ -103,6 +103,18 @@ async function register(app, suffix) {
   return response.body;
 }
 
+async function registerWithSkills(app, suffix, skills) {
+  var response = await request(app, 'POST', '/api/register', {
+    name: '技能使用者' + suffix,
+    student_id: 'D22345' + suffix,
+    email: 'skill' + suffix + '@example.com',
+    password: 'abc123',
+    skills: skills
+  });
+  assert.equal(response.status, 201);
+  return response.body;
+}
+
 test('database test context uses TEAMUP_DB_PATH and can close cleanly', async function() {
   var ctx = createContext();
   try {
@@ -111,6 +123,30 @@ test('database test context uses TEAMUP_DB_PATH and can close cleanly', async fu
     assert.equal(columns.some(function(column) {
       return column.name === 'email';
     }), true);
+  } finally {
+    await ctx.cleanup();
+  }
+});
+
+test('register and account settings persist personal skills', async function() {
+  var ctx = createContext();
+  try {
+    var created = await registerWithSkills(ctx.app, '01', 'Vue, SQLite');
+    assert.equal(created.user.skills, 'Vue, SQLite');
+
+    var me = await request(ctx.app, 'GET', '/api/users/me', null, created.token);
+    assert.equal(me.status, 200);
+    assert.equal(me.body.user.skills, 'Vue, SQLite');
+
+    var updated = await request(ctx.app, 'PUT', '/api/users/me', {
+      email: 'skill-updated@example.com',
+      password: '',
+      skills: 'Vue, Node.js, UI Design'
+    }, created.token);
+
+    assert.equal(updated.status, 200);
+    assert.equal(updated.body.user.email, 'skill-updated@example.com');
+    assert.equal(updated.body.user.skills, 'Vue, Node.js, UI Design');
   } finally {
     await ctx.cleanup();
   }
