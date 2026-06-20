@@ -14,7 +14,7 @@ test('project cards show applied projects as disabled', function() {
 
   assert.match(projectCard, /application_status/);
   assert.match(projectCard, /已申請/);
-  assert.match(projectCard, /:disabled="!canApply"/);
+  assert.match(projectCard, /:disabled="!isLoginRequired && !canApply"/);
   assert.match(presentation, /project\?\.application_status !== 'pending'/);
   assert.match(projects, /application_status:\s*project\.application_status/);
   assert.match(projects, /project\.application_status = response\.data\.application\?\.status \|\| 'pending'/);

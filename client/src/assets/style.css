@@ -1,24 +1,29 @@
 :root {
-  --bg: #f5f7fb;
-  --panel: #ffffff;
+  --bg: #f3f6ff;
+  --panel: rgba(255, 255, 255, 0.86);
   --ink: #172033;
   --muted: #64748b;
-  --line: #d8e0ec;
-  --primary: #2563eb;
-  --primary-dark: #1d4ed8;
-  --primary-soft: #e8f0ff;
-  --accent: #e11d48;
+  --line: rgba(203, 213, 225, 0.86);
+  --primary: #4f46e5;
+  --primary-dark: #3730a3;
+  --primary-soft: #eef2ff;
+  --accent: #f43f5e;
+  --success: #10b981;
   --soft: #ecfdf5;
-  --warning: #b45309;
-  --button: #2563eb;
-  --button-hover: #1d4ed8;
+  --warning: #f59e0b;
+  --button: #4f46e5;
+  --button-hover: #3730a3;
   --surface-hover: #f1f5f9;
   --topbar: #111827;
-  --topbar-accent: #93c5fd;
+  --topbar-accent: #c7d2fe;
   --tab-bg: #e8edf5;
   --tab-active: #ffffff;
+  --radius-sm: 10px;
   --radius: 16px;
-  --shadow: 0 20px 55px rgba(15, 23, 42, 0.12);
+  --radius-lg: 24px;
+  --shadow-sm: 0 8px 20px rgba(15, 23, 42, 0.06);
+  --shadow: 0 18px 45px rgba(15, 23, 42, 0.10);
+  --shadow-lg: 0 28px 70px rgba(15, 23, 42, 0.16);
 }
 
 * {
@@ -27,7 +32,10 @@
 
 body {
   margin: 0;
-  background: var(--bg);
+  background:
+    radial-gradient(circle at top left, rgba(79, 70, 229, 0.13), transparent 30%),
+    radial-gradient(circle at bottom right, rgba(14, 165, 233, 0.12), transparent 32%),
+    var(--bg);
   color: var(--ink);
   font: 15px/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
@@ -42,19 +50,22 @@ textarea {
 button {
   min-height: 42px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 12px;
   background: var(--button);
   color: white;
   cursor: pointer;
-  font-weight: 700;
+  font-weight: 800;
   padding: 0 16px;
-  transform: scale(1);
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    background 160ms ease;
 }
 
 button:hover {
   background: var(--button-hover);
-  transform: scale(1.05);
-  transition: transform 200ms ease
+  box-shadow: 0 10px 24px rgba(79, 70, 229, 0.20);
+  transform: translateY(-1px);
 }
 
 
@@ -62,6 +73,11 @@ button:disabled,
 input:disabled {
   cursor: not-allowed;
   opacity: 0.62;
+}
+
+button:disabled:hover {
+  box-shadow: none;
+  transform: none;
 }
 
 button.ghost {
@@ -109,24 +125,28 @@ input:not([type="checkbox"]),
 textarea {
   width: 100%;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.88);
   color: var(--ink);
   outline: none;
-  padding: 10px 12px;
-  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+  padding: 11px 13px;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background 160ms ease;
 }
 
 input:not([type="checkbox"]):hover,
 textarea:hover{
   border-color: var(--primary);
   box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.12);
-  transform: scale(1.015);
 }
 
 input:not([type="checkbox"]):focus,
 textarea:focus {
-  border-color: #111827;
-  transform: scale(1);
+  border-color: var(--primary);
+  background: #ffffff;
+  box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.12);
 }
 
 label[data-error]::after {
@@ -330,10 +350,18 @@ label {
   grid-column: 1;
 }
 
-.panel {
+.panel,
+.project-card,
+.account-modal,
+.auth-card {
   background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(14px);
+}
+
+.panel {
   padding: 25px;
 }
 
@@ -559,13 +587,122 @@ label {
   grid-template-columns: 1fr 170px auto 150px;
 }
 
-.project-card {
+.home-hero {
+  align-items: center;
+  background: linear-gradient(135deg, rgba(79, 70, 229, 0.94), rgba(14, 165, 233, 0.78));
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  color: white;
+  display: flex;
+  gap: 24px;
+  justify-content: space-between;
+  overflow: hidden;
+  padding: clamp(24px, 5vw, 44px);
+  position: relative;
+}
+
+.home-hero .eyebrow {
+  color: var(--topbar-accent);
+}
+
+.home-hero h1 {
+  font-size: clamp(32px, 5vw, 56px);
+  line-height: 1.05;
+  margin: 0 0 12px;
+}
+
+.home-hero p:not(.eyebrow) {
+  font-size: 17px;
+  margin: 0;
+  max-width: 620px;
+  opacity: 0.9;
+}
+
+.home-hero button {
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--primary-dark);
+  flex: 0 0 auto;
+}
+
+.home-hero button:hover {
+  background: #ffffff;
+}
+
+.home-stats {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.home-stats article {
   background: var(--panel);
-  border: 1.5px solid var(--line);
-  border-radius: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  display: grid;
+  gap: 4px;
+  padding: 18px;
+}
+
+.home-stats strong {
+  font-size: 28px;
+}
+
+.home-stats span {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.empty-state {
+  background: var(--panel);
+  border: 1px dashed rgba(100, 116, 139, 0.42);
+  border-radius: var(--radius-lg);
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  padding: 44px 20px;
+  text-align: center;
+}
+
+.empty-state h2 {
+  font-size: 24px;
+  margin: 0;
+}
+
+.empty-state p {
+  color: var(--muted);
+  margin: 0;
+}
+
+.empty-icon {
+  align-items: center;
+  background: var(--primary-soft);
+  border-radius: 50%;
+  color: var(--primary-dark);
+  display: inline-flex;
+  font-size: 32px;
+  font-weight: 900;
+  height: 54px;
+  justify-content: center;
+  line-height: 1;
+  width: 54px;
+}
+
+.project-card {
+  border-color: rgba(203, 213, 225, 0.76);
   display: grid;
   gap: 14px;
   padding: 18px;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+}
+
+.project-card:hover {
+  border-color: rgba(79, 70, 229, 0.32);
+  box-shadow: var(--shadow);
+  transform: translateY(-3px);
 }
 
 .project-head {
@@ -1587,6 +1724,15 @@ button.confirm-danger-action:hover {
     gap: 14px;
     justify-content: flex-start;
     overflow-x: auto;
+  }
+
+  .home-hero {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .home-stats {
+    grid-template-columns: 1fr;
   }
 
   .toolbar,

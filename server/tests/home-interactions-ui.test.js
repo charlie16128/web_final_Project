@@ -111,6 +111,51 @@ test('home loads public projects without forcing anonymous visitors through user
   assert.match(homeView, /await loadProjects\(\)/);
 });
 
+test('home first phase adds hero stats and a polished empty state', function() {
+  var homeView = readClient('src/views/HomeView.vue');
+
+  assert.match(homeView, /class="home-hero"/);
+  assert.match(homeView, /TeamUp Campus/);
+  assert.match(homeView, /@click="openCreateProjectForm"/);
+  assert.match(homeView, /:open-signal="openCreateFormSignal"/);
+  assert.match(homeView, /const openProjectCount = computed/);
+  assert.match(homeView, /current_members < project\.max_members/);
+  assert.match(homeView, /const fullProjectCount = computed/);
+  assert.match(homeView, /current_members >= project\.max_members/);
+  assert.match(homeView, /const topSkill = computed/);
+  assert.match(homeView, /class="home-stats"/);
+  assert.match(homeView, /開放招募/);
+  assert.match(homeView, /已額滿隊伍/);
+  assert.match(homeView, /熱門技能/);
+  assert.match(homeView, /class="empty-state"/);
+  assert.match(homeView, /目前沒有符合條件的隊伍/);
+});
+
+test('project creation form can be opened from the home hero call to action', function() {
+  var projectForm = readClient('src/components/ProjectForm.vue');
+
+  assert.match(projectForm, /openSignal/);
+  assert.match(projectForm, /watch\(\(\) => props\.openSignal/);
+  assert.match(projectForm, /open\.value = true/);
+});
+
+test('phase one campus glass visual tokens and controls are defined globally', function() {
+  var style = readClient('src/assets/style.css');
+
+  assert.match(style, /--panel:\s*rgba\(255,\s*255,\s*255,\s*0\.86\)/);
+  assert.match(style, /--primary:\s*#4f46e5/);
+  assert.match(style, /--radius-sm:\s*10px/);
+  assert.match(style, /--radius-lg:\s*24px/);
+  assert.match(style, /radial-gradient\(circle at top left, rgba\(79, 70, 229, 0\.13\)/);
+  assert.match(style, /\.panel,\s*\n\.project-card,\s*\n\.account-modal,\s*\n\.auth-card/);
+  assert.match(style, /backdrop-filter:\s*blur\(14px\)/);
+  assert.match(style, /button:hover\s*\{[\s\S]*transform:\s*translateY\(-1px\)/);
+  assert.doesNotMatch(style, /button:hover\s*\{[\s\S]*transform:\s*scale\(1\.05\)/);
+  assert.match(style, /\.home-hero/);
+  assert.match(style, /\.home-stats/);
+  assert.match(style, /\.empty-state/);
+});
+
 test('project card and project actions send anonymous visitors to login', function() {
   var projectCard = readClient('src/components/ProjectCard.vue');
   var homeView = readClient('src/views/HomeView.vue');

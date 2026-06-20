@@ -21,11 +21,43 @@
 
   <main class="page-shell">
     <div class="project-page-column">
+      <section class="home-hero">
+        <div>
+          <p class="eyebrow">TeamUp Campus</p>
+          <h1>找到適合你的校園專題夥伴</h1>
+          <p>
+            瀏覽正在招募的隊伍、比對課程與技能需求，讓專題組隊從零散訊息變成清楚可追蹤的媒合流程。
+          </p>
+        </div>
+
+        <button type="button" @click="openCreateProjectForm">
+          建立專題
+        </button>
+      </section>
+
       <ProjectForm
         :disabled="!user"
         disabled-text="登入已建立"
+        :open-signal="openCreateFormSignal"
         @create="createProject"
       />
+
+      <section class="home-stats">
+        <article>
+          <strong>{{ openProjectCount }}</strong>
+          <span>開放招募</span>
+        </article>
+
+        <article>
+          <strong>{{ fullProjectCount }}</strong>
+          <span>已額滿隊伍</span>
+        </article>
+
+        <article>
+          <strong>{{ topSkill || 'Vue' }}</strong>
+          <span>熱門技能</span>
+        </article>
+      </section>
 
       <section class="toolbar">
         <input
@@ -53,8 +85,13 @@
       </section>
 
       <section class="projects">
-        <article v-if="!projects.length" class="project-card">
-          <p class="description">目前沒有符合條件的隊伍。</p>
+        <article v-if="!projects.length" class="empty-state">
+          <div class="empty-icon" aria-hidden="true">+</div>
+          <h2>目前沒有符合條件的隊伍</h2>
+          <p>調整搜尋或篩選條件，也可以建立新的專題開始招募同學。</p>
+          <button type="button" @click="openCreateProjectForm">
+            建立專題
+          </button>
         </article>
 
         <ProjectCard
@@ -147,10 +184,39 @@ const PROJECT_BATCH_SIZE = 5
 const visibleProjectCount = ref(PROJECT_BATCH_SIZE)
 const projectListSentinel = ref(null)
 const applyProjectTarget = ref(null)
+const openCreateFormSignal = ref(0)
 let projectObserver = null
 
 const isAdmin = computed(() => user.value?.role === 'admin' || user.value?.role === 'super_admin')
 const displayedProjects = computed(() => projects.value.slice(0, visibleProjectCount.value))
+const openProjectCount = computed(() =>
+  projects.value.filter((project) =>
+    project.accepting_applications &&
+    project.current_members < project.max_members
+  ).length
+)
+const fullProjectCount = computed(() =>
+  projects.value.filter((project) =>
+    project.current_members >= project.max_members
+  ).length
+)
+const topSkill = computed(() => {
+  const countMap = {}
+
+  projects.value.forEach((project) => {
+    const skills = (project.required_skills || '')
+      .split(',')
+      .map((skill) => skill.trim())
+      .filter(Boolean)
+
+    skills.forEach((skill) => {
+      countMap[skill] = (countMap[skill] || 0) + 1
+    })
+  })
+
+  return Object.entries(countMap)
+    .sort((a, b) => b[1] - a[1])?.[0]?.[0]
+})
 
 function requireLogin() {
   return router.push({ name: 'login' })
@@ -183,6 +249,15 @@ function observeProjectListSentinel() {
 
 function resetVisibleProjects() {
   visibleProjectCount.value = PROJECT_BATCH_SIZE
+}
+
+function openCreateProjectForm() {
+  if (!user.value) {
+    requireLogin()
+    return
+  }
+
+  openCreateFormSignal.value += 1
 }
 
 function openApplyModal(project) {

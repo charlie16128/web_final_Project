@@ -29,15 +29,16 @@ test('project presentation utility formats skills, capacity, and project actions
   }, { id: 2 }), false);
   assert.equal(projectPresentation.capacityText({ current_members: 2, max_members: 4 }), '人數：2 / 4');
   assert.equal(projectPresentation.favoriteText({ is_favorited: 1 }), '取消收藏');
-  assert.equal(projectPresentation.favoriteText({ is_favorited: 0 }), '收藏');
+  assert.equal(projectPresentation.favoriteText({ is_favorited: 0 }), '⭐');
 });
 
 test('home project list wires favorite filtering and project card favorite events', function() {
   var homeView = readClient('src/views/HomeView.vue');
+  var projects = readClient('src/composables/useProjects.js');
   var projectCard = readClient('src/components/ProjectCard.vue');
   var style = readClient('src/assets/style.css');
 
-  assert.match(homeView, /filter:\s*filters\.filter/);
+  assert.match(projects, /filter:\s*filters\.filter/);
   assert.match(homeView, /toggleFavorite/);
   assert.match(projectCard, /favoriteText/);
   assert.match(projectCard, /skillTags/);

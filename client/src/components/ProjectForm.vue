@@ -39,7 +39,7 @@
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue'
+import { reactive, ref, watch } from 'vue'
 
 const props = defineProps({
   defaultOpen: {
@@ -53,6 +53,10 @@ const props = defineProps({
   disabledText: {
     type: String,
     default: '登入已建立'
+  },
+  openSignal: {
+    type: Number,
+    default: 0
   }
 })
 
@@ -85,4 +89,10 @@ function submit() {
   Object.assign(form, emptyProjectForm())
   open.value = false
 }
+
+watch(() => props.openSignal, () => {
+  if (!props.disabled) {
+    open.value = true
+  }
+})
 </script>

@@ -10,10 +10,11 @@ function readClient(filePath) {
 test('account settings moved to a Vue modal for email and password only', function() {
   var home = readClient('src/views/HomeView.vue');
   var modal = readClient('src/components/AccountModal.vue');
+  var dashboardBase = readClient('src/composables/useDashboardBase.js');
 
   assert.match(home, /<AccountModal/);
   assert.match(home, /@save="saveAccountSettings"/);
-  assert.match(home, /api\.put\('\/users\/me'/);
+  assert.match(dashboardBase, /api\.put\('\/users\/me'/);
   assert.match(modal, /class="account-modal-backdrop"/);
   assert.match(modal, /role="dialog"/);
   assert.match(modal, /aria-modal="true"/);
