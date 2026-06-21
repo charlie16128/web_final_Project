@@ -839,6 +839,8 @@ router.delete('/admin/users/:student_id', asyncHandler(async function(req, res) 
 
 router.get('/projects', auth.optionalAuth, asyncHandler(async function(req, res) {
   var userId = req.user ? req.user.student_id : null;
+  var includeOwned = req.query.include_owned === '1' || req.query.include_owned === 'true';
+  var projectExclusionUserId = includeOwned ? null : userId;
   var favoriteFilter = req.query.filter === 'favorited';
   if (favoriteFilter && !userId) {
     res.status(401).json({ message: '請先登入' });
@@ -885,10 +887,10 @@ router.get('/projects', auth.optionalAuth, asyncHandler(async function(req, res)
       '%' + (req.query.q || '') + '%',
       '%' + (req.query.q || '') + '%',
       '%' + (req.query.q || '') + '%',
-      userId,
-      userId,
-      userId,
-      userId,
+      projectExclusionUserId,
+      projectExclusionUserId,
+      projectExclusionUserId,
+      projectExclusionUserId,
       favoriteFilter ? 1 : 0,
       userId
     ]

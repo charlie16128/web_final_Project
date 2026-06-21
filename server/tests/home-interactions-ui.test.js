@@ -108,7 +108,7 @@ test('home loads public projects without forcing anonymous visitors through user
 
   assert.match(homeView, /localStorage\.getItem\('teamup_token'\)/);
   assert.match(homeView, /if \(localStorage\.getItem\('teamup_token'\)\) \{\s*await loadUser\(\)\s*\}/);
-  assert.match(homeView, /await loadProjects\(\)/);
+  assert.match(homeView, /await Promise\.all\(\[loadProjects\(\), loadSkillStatProjects\(\)\]\)/);
 });
 
 test('home first phase adds hero stats and a polished empty state', function() {

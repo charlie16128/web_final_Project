@@ -1,5 +1,5 @@
 <template>
-  <div :class="['app-frame', { 'app-frame--auth': isAuthRoute }]">
+  <div :class="['app-frame', { 'app-frame--auth': isAuthRoute, 'app-frame--group': isGroupRoute }]">
     <RouterView />
     <SystemWarningModal
       v-if="warnings.length"
@@ -18,6 +18,7 @@ import SystemWarningModal from './components/SystemWarningModal.vue'
 const route = useRoute()
 const warnings = ref([])
 const isAuthRoute = computed(() => route.name === 'login' || route.name === 'register')
+const isGroupRoute = computed(() => route.name === 'group')
 
 async function loadWarnings() {
   if (!localStorage.getItem('teamup_token')) {

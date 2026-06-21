@@ -203,6 +203,31 @@ test('project list exposes pending application status after the user applies', a
   }
 });
 
+test('project list can include owned projects for global skill statistics', async function() {
+  var ctx = createContext();
+  try {
+    var owner = await register(ctx.app, '08');
+    var created = await createProject(ctx.app, owner.token, {
+      title: 'Owned Skill Stats Project',
+      required_skills: 'Vue, HTML'
+    });
+
+    var regularList = await request(ctx.app, 'GET', '/api/projects', null, owner.token);
+    assert.equal(regularList.status, 200);
+    assert.equal(regularList.body.projects.some(function(project) {
+      return project.id === created.id;
+    }), false);
+
+    var statsList = await request(ctx.app, 'GET', '/api/projects?include_owned=1', null, owner.token);
+    assert.equal(statsList.status, 200);
+    assert.equal(statsList.body.projects.some(function(project) {
+      return project.id === created.id && project.required_skills === 'Vue, HTML';
+    }), true);
+  } finally {
+    await ctx.cleanup();
+  }
+});
+
 test('project github urls are optional, persisted, and must use github prefix', async function() {
   var ctx = createContext();
   try {

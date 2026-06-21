@@ -27,6 +27,8 @@ test('keeps auth pages at their original font size while scaling the app UI to b
     style,
     /\.auth-shell,\s*[\s\S]*?\.auth-shell \.toast\s*\{\s*font-size:\s*15px;\s*\}/
   );
+  assert.match(style, /\.auth-copy h1\s*\{\s*font-size:\s*clamp\(28px,\s*4vw,\s*48px\);/);
+  assert.match(style, /\.auth-copy p:not\(\.eyebrow\)\s*\{[\s\S]*font-size:\s*15px;/);
   assert.match(style, /\.topbar h1\s*\{\s*font-size:\s*clamp\(28px,\s*4vw,\s*48px\);/);
   assert.match(style, /\.section-title h2\s*\{\s*font-size:\s*21px;/);
   assert.match(style, /\.project-head h2,\s*[\s\S]*?\.modal-head h2\s*\{\s*font-size:\s*24px;/);
@@ -49,4 +51,17 @@ test('scales scoped dashboard widget captions to browser 125 percent', function(
   assert.match(countdownModal, /\.countdown-detail-grid dt\s*\{[\s\S]*font-size:\s*15px;/);
   assert.match(announcementBar, /\.announcement-card small,\s*[\s\S]*?\.countdown-empty\s*\{[\s\S]*font-size:\s*15px;/);
   assert.match(announcementModal, /\.countdown-detail-grid dt\s*\{[\s\S]*font-size:\s*15px;/);
+});
+
+test('removes requested gradient backgrounds from group and quick-add controls', function() {
+  var app = readClient('src/App.vue');
+  var style = readClient('src/assets/style.css');
+  var countdownBar = readClient('src/components/CountdownBar.vue');
+  var announcementBar = readClient('src/components/AnnouncementBar.vue');
+
+  assert.match(app, /app-frame--group/);
+  assert.match(app, /route\.name === 'group'/);
+  assert.match(style, /\.app-frame--group\s*\{[\s\S]*background:\s*var\(--bg\);/);
+  assert.doesNotMatch(countdownBar, /\.add-countdown-btn\s*\{[\s\S]*linear-gradient/);
+  assert.doesNotMatch(announcementBar, /\.add-countdown-btn\s*\{[\s\S]*linear-gradient/);
 });

@@ -158,6 +158,7 @@ import ProjectForm from '../components/ProjectForm.vue'
 import ToastMessage from '../components/ToastMessage.vue'
 import { useDashboardBase } from '../composables/useDashboardBase'
 import { useProjects } from '../composables/useProjects'
+import { skillTags } from '../utils/projectPresentation'
 
 const router = useRouter()
 
@@ -192,6 +193,7 @@ const visibleProjectCount = ref(PROJECT_BATCH_SIZE)
 const projectListSentinel = ref(null)
 const applyProjectTarget = ref(null)
 const openCreateFormSignal = ref(0)
+const skillStatProjects = ref([])
 let projectObserver = null
 
 const isAdmin = computed(() => user.value?.role === 'admin' || user.value?.role === 'super_admin')
@@ -210,11 +212,8 @@ const fullProjectCount = computed(() =>
 const popularSkills = computed(() => {
   const countMap = {}
 
-  projects.value.forEach((project) => {
-    const skills = (project.required_skills || '')
-      .split(',')
-      .map((skill) => skill.trim())
-      .filter(Boolean)
+  skillStatProjects.value.forEach((project) => {
+    const skills = skillTags(project.required_skills)
 
     skills.forEach((skill) => {
       countMap[skill] = (countMap[skill] || 0) + 1
@@ -227,6 +226,13 @@ const popularSkills = computed(() => {
     .slice(0, 3)
 })
 const topSkill = computed(() => popularSkills.value[0]?.name)
+
+async function loadSkillStatProjects() {
+  const response = await api.get('/projects', {
+    params: { include_owned: 1 }
+  })
+  skillStatProjects.value = response.data.projects || []
+}
 
 function requireLogin() {
   return router.push({ name: 'login' })
@@ -298,7 +304,7 @@ async function createProject(form) {
   try {
     await api.post('/projects', form)
     showToast('隊伍已建立')
-    await loadProjects()
+    await Promise.all([loadProjects(), loadSkillStatProjects()])
   } catch (error) {
     showToast(error.response?.data?.message || '建立隊伍失敗')
   }
@@ -309,7 +315,7 @@ onMounted(async () => {
     if (localStorage.getItem('teamup_token')) {
       await loadUser()
     }
-    await loadProjects()
+    await Promise.all([loadProjects(), loadSkillStatProjects()])
     await nextTick()
     observeProjectListSentinel()
   } catch (error) {

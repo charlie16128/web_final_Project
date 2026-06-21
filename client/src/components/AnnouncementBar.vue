@@ -76,7 +76,7 @@ function formatTime(value) {
 }
 
 .add-countdown-btn {
-  background: linear-gradient(135deg, #047857, #f59e0b);
+  background: var(--button);
   border: none;
   border-radius: 8px;
   color: white;

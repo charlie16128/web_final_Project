@@ -2,10 +2,20 @@ export function skillTags(skills) {
   if (!skills) {
     return []
   }
+
+  const seen = new Set()
+
   return String(skills)
-    .split(',')
-    .map((skill) => skill.trim())
+    .split(/[\uFF0C\u3001,]/)
+    .map((skill) => skill.trim().toUpperCase())
     .filter(Boolean)
+    .filter((skill) => {
+      if (seen.has(skill)) {
+        return false
+      }
+      seen.add(skill)
+      return true
+    })
 }
 
 export function isProjectFull(project) {

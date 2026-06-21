@@ -16,7 +16,14 @@ test('project presentation utility formats skills, capacity, and project actions
   var moduleUrl = url.pathToFileURL(clientPath('src/utils/projectPresentation.js')).href;
   var projectPresentation = await import(moduleUrl);
 
-  assert.deepEqual(projectPresentation.skillTags('Vue, Node.js, SQLite'), ['Vue', 'Node.js', 'SQLite']);
+  var ideographicComma = String.fromCharCode(0x3001);
+  var fullwidthComma = String.fromCharCode(0xFF0C);
+
+  assert.deepEqual(projectPresentation.skillTags('Vue, Node.js, SQLite'), ['VUE', 'NODE.JS', 'SQLITE']);
+  assert.deepEqual(projectPresentation.skillTags('vue' + ideographicComma + 'html'), ['VUE', 'HTML']);
+  assert.deepEqual(projectPresentation.skillTags('vue' + fullwidthComma + 'html'), ['VUE', 'HTML']);
+  assert.deepEqual(projectPresentation.skillTags('vue, html'), ['VUE', 'HTML']);
+  assert.deepEqual(projectPresentation.skillTags('Vue' + ideographicComma + 'vue' + fullwidthComma + 'HTML, html'), ['VUE', 'HTML']);
   assert.deepEqual(projectPresentation.skillTags(''), []);
   assert.equal(projectPresentation.isProjectFull({ current_members: 4, max_members: 4, status: 'open' }), true);
   assert.equal(projectPresentation.isProjectFull({ current_members: 1, max_members: 4, status: 'full' }), true);
@@ -30,6 +37,28 @@ test('project presentation utility formats skills, capacity, and project actions
   assert.equal(projectPresentation.capacityText({ current_members: 2, max_members: 4 }), '人數：2 / 4');
   assert.equal(projectPresentation.favoriteText({ is_favorited: 1 }), '取消收藏');
   assert.equal(projectPresentation.favoriteText({ is_favorited: 0 }), '⭐');
+});
+
+test('home popular skill counts use the shared normalized skill parser', function() {
+  var homeView = readClient('src/views/HomeView.vue');
+
+  assert.match(homeView, /import \{ skillTags \} from '..\/utils\/projectPresentation'/);
+  assert.match(homeView, /skillTags\(project\.required_skills\)/);
+  assert.doesNotMatch(homeView, /\.split\('\,'\)/);
+});
+
+test('home popular skill counts scan all groups instead of the filtered list', function() {
+  var homeView = readClient('src/views/HomeView.vue');
+
+  assert.match(homeView, /const skillStatProjects = ref\(\[\]\)/);
+  assert.match(homeView, /async function loadSkillStatProjects\(\)/);
+  assert.ok(homeView.includes("const response = await api.get('/projects',"));
+  assert.ok(homeView.includes('params: { include_owned: 1 }'));
+  assert.match(homeView, /skillStatProjects\.value = response\.data\.projects \|\| \[\]/);
+  assert.match(homeView, /skillStatProjects\.value\.forEach\(\(project\) => \{/);
+  assert.doesNotMatch(homeView, /popularSkills = computed\(\(\) => \{[\s\S]*?projects\.value\.forEach\(\(project\) => \{/);
+  assert.match(homeView, /await Promise\.all\(\[loadProjects\(\), loadSkillStatProjects\(\)\]\)/);
+  assert.equal((homeView.match(/loadSkillStatProjects\(\)/g) || []).length, 3);
 });
 
 test('home project list wires favorite filtering and project card favorite events', function() {
