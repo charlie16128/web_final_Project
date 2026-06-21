@@ -7,7 +7,9 @@
       class="admin-entry-button"
       :to="{ name: 'admin' }"
     >
-      管理員專用介面
+      <span class="admin-entry-icon" aria-hidden="true">!</span>
+      <strong>管理員專用介面</strong>
+      <small>查看檢舉、會員狀態與平台統計</small>
     </RouterLink>
   </div>
 

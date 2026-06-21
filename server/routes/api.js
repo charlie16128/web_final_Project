@@ -590,6 +590,22 @@ router.delete('/me/warnings/:id', auth.authRequired, asyncHandler(async function
 
 router.use('/admin', auth.authRequired, requireAdmin);
 
+router.get('/admin/stats', asyncHandler(async function(req, res) {
+  var pendingReports = await db.get('SELECT COUNT(*) AS count FROM reports WHERE status = "pending"');
+  var todayProjects = await db.get('SELECT COUNT(*) AS count FROM projects WHERE DATE(created_at) = DATE("now")');
+  var bannedUsers = await db.get('SELECT COUNT(*) AS count FROM users WHERE banned_until IS NOT NULL');
+  var totalUsers = await db.get('SELECT COUNT(*) AS count FROM users');
+
+  res.json({
+    stats: {
+      pending_reports: Number(pendingReports.count || 0),
+      today_projects: Number(todayProjects.count || 0),
+      banned_users: Number(bannedUsers.count || 0),
+      total_users: Number(totalUsers.count || 0)
+    }
+  });
+}));
+
 router.get('/admin/reports', asyncHandler(async function(req, res) {
   var status = req.query.status || 'pending';
   var allowed = ['pending', 'ignored', 'handled', 'all'];

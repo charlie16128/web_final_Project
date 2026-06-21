@@ -20,6 +20,28 @@
         </div>
       </div>
 
+      <section class="admin-stats" aria-label="管理統計">
+        <article>
+          <strong>{{ stats.pending_reports }}</strong>
+          <span>待處理檢舉</span>
+        </article>
+
+        <article>
+          <strong>{{ stats.today_projects }}</strong>
+          <span>今日新增隊伍</span>
+        </article>
+
+        <article>
+          <strong>{{ stats.banned_users }}</strong>
+          <span>停權會員</span>
+        </article>
+
+        <article>
+          <strong>{{ stats.total_users }}</strong>
+          <span>會員總數</span>
+        </article>
+      </section>
+
       <section v-if="tab === 'reports'" class="admin-list">
         <article v-if="!reports.length" class="mini-item">目前沒有待處理檢舉</article>
 
@@ -126,6 +148,12 @@ const user = ref(JSON.parse(localStorage.getItem('teamup_user') || 'null'))
 const tab = ref('reports')
 const reports = ref([])
 const users = ref([])
+const stats = reactive({
+  pending_reports: 0,
+  today_projects: 0,
+  banned_users: 0,
+  total_users: 0
+})
 const userSearch = ref('')
 const toast = ref('')
 const actionModal = reactive({
@@ -175,6 +203,11 @@ async function loadUser() {
   if (!isAdmin(user.value)) {
     await router.replace({ name: 'home' })
   }
+}
+
+async function loadStats() {
+  const response = await api.get('/admin/stats')
+  Object.assign(stats, response.data.stats || {})
 }
 
 async function loadReports() {
@@ -349,6 +382,7 @@ async function unbanUser(member) {
   try {
     const response = await api.post(`/admin/users/${member.student_id}/unban`)
     Object.assign(member, response.data.user)
+    await loadStats()
     showToast('已解除停權')
   } catch (error) {
     showToast(error.response?.data?.message || '解除停權失敗')
@@ -363,6 +397,7 @@ async function deleteUser(member) {
   try {
     await api.delete(`/admin/users/${member.student_id}`)
     users.value = users.value.filter((item) => item.student_id !== member.student_id)
+    await loadStats()
     showToast('帳號已刪除')
   } catch (error) {
     showToast(error.response?.data?.message || '刪除帳號失敗')
@@ -379,7 +414,7 @@ onMounted(async () => {
   try {
     await loadUser()
     if (isAdmin(user.value)) {
-      await Promise.all([loadReports(), loadUsers()])
+      await Promise.all([loadStats(), loadReports(), loadUsers()])
     }
   } catch (error) {
     showToast(error.response?.data?.message || '管理員資料載入失敗')
