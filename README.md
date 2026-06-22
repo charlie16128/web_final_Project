@@ -11,8 +11,13 @@ server/  Express API, JWT auth, SQLite database
 
 The Express server only serves JSON API routes under `/api`. Frontend routes such as `/`, `/login`, `/register`, and `/groups/:id` are handled by Vue Router in the Vite client.
 
-## Setup
+## 下載專案
+```bash
+git clone https://github.com/charlie16128/web_final_Project.git
+cd web_final_Project
+```
 
+## 安裝套件
 ```bash
 npm install
 npm run install:all
@@ -20,7 +25,7 @@ npm run install:all
 
 ## 注意你需要分別在根目錄、/client、/server 安裝 npm install 才能跑
 
-## Development
+## 啟動開發環境
 
 Run both apps:
 
@@ -51,4 +56,22 @@ Client:     http://localhost:5173
 
 ```bash
 npm test
+```
+
+### 前端打包
+
+```bash
+npm run build
+```
+
+打包後會產生：
+
+```txt
+client/dist/
+```
+
+### 啟動後端
+
+```bash
+npm run start
 ```
