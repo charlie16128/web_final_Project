@@ -302,7 +302,7 @@ async function createProject(form) {
     await requireLogin()
     return
   }
-
+ 
   try {
     await api.post('/projects', form)
     showToast('隊伍已建立')
