@@ -1388,7 +1388,7 @@ router.get('/groups/:id/announcements', auth.authRequired, asyncHandler(async fu
       'WHERE project_announcements.project_id = ? ORDER BY project_announcements.created_at DESC',
     [req.params.id]
   );
-  res.json({ announcements: announcements });
+  res.json({ announcements: announcements.map(publicAnnouncement) });
 }));
 
 router.post('/groups/:id/announcements', auth.authRequired, asyncHandler(async function(req, res) {
@@ -2033,13 +2033,40 @@ function commentById(id) {
   );
 }
 
+function utcTimestampToIso(value) {
+  if (!value) {
+    return value;
+  }
+
+  var normalized = String(value).trim();
+  var sqliteUtcMatch = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})$/.exec(normalized);
+  if (sqliteUtcMatch) {
+    return sqliteUtcMatch[1] + 'T' + sqliteUtcMatch[2] + '.000Z';
+  }
+
+  var date = new Date(normalized);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return date.toISOString();
+}
+
+function publicAnnouncement(row) {
+  if (!row) {
+    return null;
+  }
+  row.created_at = utcTimestampToIso(row.created_at);
+  row.updated_at = utcTimestampToIso(row.updated_at);
+  return row;
+}
+
 function announcementById(id) {
   return db.get(
       'SELECT project_announcements.*, users.name AS author_name, users.role AS author_role ' +
       'FROM project_announcements JOIN users ON users.student_id = project_announcements.author_id ' +
       'WHERE project_announcements.id = ?',
     [id]
-  );
+  ).then(publicAnnouncement);
 }
 
 function deadlineById(id) {

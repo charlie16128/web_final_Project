@@ -167,6 +167,33 @@ test('project owners manage announcements while members can only read them', asy
   }
 });
 
+test('announcement timestamps are returned as parseable UTC instants for Taipei display', async function() {
+  var ctx = createContext();
+  try {
+    var owner = await register(ctx.app, '13');
+    var project = await createProject(ctx.app, owner.token);
+
+    var created = await request(ctx.app, 'POST', '/api/groups/' + project.id + '/announcements', {
+      content: 'Timestamp should render in Taipei time.'
+    }, owner.token);
+    assert.equal(created.status, 201);
+    assert.match(created.body.announcement.created_at, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+    assert.ok(Number.isFinite(new Date(created.body.announcement.created_at).getTime()));
+
+    var listed = await request(ctx.app, 'GET', '/api/groups/' + project.id + '/announcements', null, owner.token);
+    assert.equal(listed.status, 200);
+    assert.match(listed.body.announcements[0].created_at, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+
+    var updated = await request(ctx.app, 'PUT', '/api/groups/' + project.id + '/announcements/' + created.body.announcement.id, {
+      content: 'Updated timestamp should render in Taipei time.'
+    }, owner.token);
+    assert.equal(updated.status, 200);
+    assert.match(updated.body.announcement.updated_at, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+    assert.ok(Number.isFinite(new Date(updated.body.announcement.updated_at).getTime()));
+  } finally {
+    await ctx.cleanup();
+  }
+});
 test('project owners manage deadlines and lists are ordered by nearest date', async function() {
   var ctx = createContext();
   try {
