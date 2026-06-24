@@ -34,7 +34,7 @@
           </div>
           <div>
             <dt>完整說明</dt>
-            <dd>{{ countdown.description || '未填' }}</dd>
+            <dd>{{ countdown.description || '未填寫' }}</dd>
           </div>
           <div>
             <dt>目標時間</dt>
@@ -62,6 +62,7 @@
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
+import { taipeiInputToIso, toTaipeiInputValue } from '../utils/taipeiTime'
 
 const props = defineProps({
   mode: {
@@ -104,7 +105,7 @@ const remainingDetail = computed(() => {
 
   const diff = new Date(props.countdown.target_time).getTime() - Date.now()
   if (!Number.isFinite(diff) || diff <= 0) {
-    return '已到期'
+    return '已結束'
   }
 
   const days = Math.floor(diff / 86400000)
@@ -114,22 +115,10 @@ const remainingDetail = computed(() => {
   return `${days} 天 ${hours} 小時 ${minutes} 分 ${seconds} 秒`
 })
 
-function toLocalInputValue(value) {
-  if (!value) {
-    return ''
-  }
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return ''
-  }
-  const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000)
-  return offsetDate.toISOString().slice(0, 16)
-}
-
 function resetForm() {
   form.title = props.countdown?.title || ''
   form.description = props.countdown?.description || ''
-  form.target_time = toLocalInputValue(props.countdown?.target_time)
+  form.target_time = toTaipeiInputValue(props.countdown?.target_time)
   error.value = ''
   isEditing.value = false
 }
@@ -156,7 +145,7 @@ function submit() {
   const payload = {
     title: form.title,
     description: form.description,
-    target_time: form.target_time
+    target_time: taipeiInputToIso(form.target_time)
   }
 
   if (isCreateMode.value) {

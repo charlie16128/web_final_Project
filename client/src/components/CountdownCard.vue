@@ -36,7 +36,7 @@ const remainingText = computed(() => {
 
   const diff = target.getTime() - Date.now()
   if (diff <= 0) {
-    return '已到期'
+    return '已結束'
   }
 
   const days = Math.floor(diff / 86400000)

@@ -1,4 +1,4 @@
-﻿var express = require('express');
+var express = require('express');
 var bcrypt = require('bcrypt');
 var db = require('../database/db');
 var auth = require('../middleware/auth');
@@ -1465,11 +1465,44 @@ function normalizedTargetTime(value) {
   if (!required(value)) {
     return null;
   }
-  var date = new Date(String(value).trim());
-  if (Number.isNaN(date.getTime())) {
+
+  var normalized = String(value).trim();
+  var hasExplicitTimezone = /(?:[zZ]|[+-]\d\d:?\d\d)$/.test(normalized);
+  var date = hasExplicitTimezone ? new Date(normalized) : dateFromTaipeiLocalInput(normalized);
+  if (!date || Number.isNaN(date.getTime())) {
     return null;
   }
   return date.toISOString();
+}
+
+function dateFromTaipeiLocalInput(value) {
+  var match = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?$/.exec(value);
+  if (!match) {
+    return null;
+  }
+
+  var year = Number(match[1]);
+  var month = Number(match[2]);
+  var day = Number(match[3]);
+  var hour = Number(match[4]);
+  var minute = Number(match[5]);
+  var second = Number(match[6] || 0);
+  var millisecond = Number((match[7] || '0').padEnd(3, '0'));
+  var localCheck = new Date(Date.UTC(year, month - 1, day, hour, minute, second, millisecond));
+
+  if (
+    localCheck.getUTCFullYear() !== year ||
+    localCheck.getUTCMonth() !== month - 1 ||
+    localCheck.getUTCDate() !== day ||
+    localCheck.getUTCHours() !== hour ||
+    localCheck.getUTCMinutes() !== minute ||
+    localCheck.getUTCSeconds() !== second ||
+    localCheck.getUTCMilliseconds() !== millisecond
+  ) {
+    return null;
+  }
+
+  return new Date(Date.UTC(year, month - 1, day, hour - 8, minute, second, millisecond));
 }
 
 function canManageCountdown(project, countdown, userId) {

@@ -124,6 +124,33 @@ async function inviteAndAccept(app, projectId, inviterToken, invitee) {
   assert.equal(accepted.status, 200);
 }
 
+test('countdown datetime-local values are interpreted as UTC+8', async function() {
+  var previousTz = process.env.TZ;
+  process.env.TZ = 'UTC';
+
+  var ctx = createContext();
+  try {
+    var leader = await register(ctx.app, '11');
+    var project = await createProject(ctx.app, leader.token);
+
+    var created = await request(ctx.app, 'POST', '/api/groups/' + project.id + '/countdowns', {
+      title: 'Taipei local deadline',
+      target_time: '2099-03-10T18:45'
+    }, leader.token);
+    assert.equal(created.status, 201);
+    assert.equal(created.body.countdown.target_time, '2099-03-10T10:45:00.000Z');
+
+    var updated = await request(ctx.app, 'PATCH', '/api/groups/' + project.id + '/countdowns/' + created.body.countdown.id, {
+      title: 'Updated Taipei local deadline',
+      target_time: '2099-03-11T08:15'
+    }, leader.token);
+    assert.equal(updated.status, 200);
+    assert.equal(updated.body.countdown.target_time, '2099-03-11T00:15:00.000Z');
+  } finally {
+    await ctx.cleanup();
+    restoreEnv('TZ', previousTz);
+  }
+});
 test('group members create multiple countdowns and authorized users manage them', async function() {
   var ctx = createContext();
   try {
